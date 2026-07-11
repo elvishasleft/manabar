@@ -111,11 +111,8 @@ mod tests {
     use std::fs;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    static PARSE_CALLS: AtomicUsize = AtomicUsize::new(0);
-
     // test log format: one event per line, "rfc3339|model|input|cache_read|cache_write|output"
     fn test_parse(text: &str, _mtime: DateTime<Utc>) -> Vec<UsageEvent> {
-        PARSE_CALLS.fetch_add(1, Ordering::SeqCst);
         text.lines()
             .filter_map(|l| {
                 let p: Vec<&str> = l.split('|').collect();
@@ -132,6 +129,13 @@ mod tests {
                 })
             })
             .collect()
+    }
+
+    static CACHE_TEST_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    fn counting_parse(text: &str, mtime: DateTime<Utc>) -> Vec<UsageEvent> {
+        CACHE_TEST_CALLS.fetch_add(1, Ordering::SeqCst);
+        test_parse(text, mtime)
     }
 
     fn any_log(p: &std::path::Path) -> bool {
@@ -193,17 +197,17 @@ mod tests {
         let today = NaiveDate::from_ymd_opt(2026, 7, 11).unwrap();
         fs::write(dir.path().join("a.log"), "2026-07-11T08:00:00Z|model-a|1|0|0|1\n").unwrap();
         let mut cache = LogCache::default();
-        let before = PARSE_CALLS.load(Ordering::SeqCst);
-        aggregate_dir(&mut cache, dir.path(), any_log, test_parse, &priced(), today);
-        aggregate_dir(&mut cache, dir.path(), any_log, test_parse, &priced(), today);
-        assert_eq!(PARSE_CALLS.load(Ordering::SeqCst) - before, 1, "second pass must hit cache");
+        let before = CACHE_TEST_CALLS.load(Ordering::SeqCst);
+        aggregate_dir(&mut cache, dir.path(), any_log, counting_parse, &priced(), today);
+        aggregate_dir(&mut cache, dir.path(), any_log, counting_parse, &priced(), today);
+        assert_eq!(CACHE_TEST_CALLS.load(Ordering::SeqCst) - before, 1, "second pass must hit cache");
         fs::write(
             dir.path().join("a.log"),
             "2026-07-11T08:00:00Z|model-a|1|0|0|1\n2026-07-11T09:00:00Z|model-a|2|0|0|2\n",
         )
         .unwrap();
-        let stats = aggregate_dir(&mut cache, dir.path(), any_log, test_parse, &priced(), today);
-        assert_eq!(PARSE_CALLS.load(Ordering::SeqCst) - before, 2);
+        let stats = aggregate_dir(&mut cache, dir.path(), any_log, counting_parse, &priced(), today);
+        assert_eq!(CACHE_TEST_CALLS.load(Ordering::SeqCst) - before, 2);
         assert_eq!(stats.days[6].input_tokens, 3);
     }
 }
