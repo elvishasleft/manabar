@@ -10,7 +10,10 @@ pub fn parse_file(text: &str, mtime: DateTime<Utc>) -> Vec<UsageEvent> {
     let Ok(v) = serde_json::from_str::<serde_json::Value>(text) else {
         return vec![];
     };
-    let tokens = v.get("contextTokensUsed").and_then(|t| t.as_u64()).unwrap_or(0);
+    let tokens = v
+        .get("contextTokensUsed")
+        .and_then(|t| t.as_u64())
+        .unwrap_or(0);
     if tokens == 0 {
         return vec![];
     }

@@ -21,7 +21,10 @@ async fn live_claude() {
 #[ignore = "hits real endpoints with local credentials; run manually"]
 async fn live_codex() {
     let p = CodexProvider::new(real_home());
-    let snap = p.fetch_quota(&client()).await.expect("codex live fetch failed");
+    let snap = p
+        .fetch_quota(&client())
+        .await
+        .expect("codex live fetch failed");
     println!("codex: {snap:#?}");
     assert!(!snap.windows.is_empty());
 }
@@ -30,7 +33,10 @@ async fn live_codex() {
 #[ignore = "hits real endpoints with local credentials; run manually"]
 async fn live_grok() {
     let p = GrokProvider::new(real_home());
-    let snap = p.fetch_quota(&client()).await.expect("grok live fetch failed");
+    let snap = p
+        .fetch_quota(&client())
+        .await
+        .expect("grok live fetch failed");
     println!("grok: {snap:#?}");
     assert!(!snap.windows.is_empty());
 }

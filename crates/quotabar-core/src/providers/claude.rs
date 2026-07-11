@@ -62,7 +62,11 @@ pub fn parse_quota(
             None => p,
         }
     });
-    Ok(QuotaSnapshot { plan, windows, fetched_at })
+    Ok(QuotaSnapshot {
+        plan,
+        windows,
+        fetched_at,
+    })
 }
 
 pub struct ClaudeProvider {
@@ -72,7 +76,10 @@ pub struct ClaudeProvider {
 
 impl ClaudeProvider {
     pub fn new(home: PathBuf) -> Self {
-        Self { base_url: "https://api.anthropic.com".into(), home }
+        Self {
+            base_url: "https://api.anthropic.com".into(),
+            home,
+        }
     }
 
     pub async fn fetch_quota(

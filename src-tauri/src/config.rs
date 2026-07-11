@@ -12,7 +12,11 @@ pub struct Enabled {
 
 impl Default for Enabled {
     fn default() -> Self {
-        Self { claude: true, codex: true, grok: true }
+        Self {
+            claude: true,
+            codex: true,
+            grok: true,
+        }
     }
 }
 
@@ -35,7 +39,11 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        Self { poll_interval_secs: 1800, enabled: Enabled::default(), price_overrides: vec![] }
+        Self {
+            poll_interval_secs: 1800,
+            enabled: Enabled::default(),
+            price_overrides: vec![],
+        }
     }
 }
 
@@ -57,7 +65,10 @@ pub fn save(path: &Path, cfg: &Config) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    std::fs::write(path, serde_json::to_string_pretty(cfg).expect("config serializes"))
+    std::fs::write(
+        path,
+        serde_json::to_string_pretty(cfg).expect("config serializes"),
+    )
 }
 
 pub fn price_table(cfg: &Config) -> PriceTable {
@@ -98,7 +109,10 @@ mod tests {
         let path = dir.path().join("config.json");
         let cfg = Config {
             poll_interval_secs: 600,
-            enabled: Enabled { codex: false, ..Enabled::default() },
+            enabled: Enabled {
+                codex: false,
+                ..Enabled::default()
+            },
             ..Config::default()
         };
         save(&path, &cfg).unwrap();

@@ -61,7 +61,11 @@ pub fn parse_quota(body: &str, fetched_at: DateTime<Utc>) -> Result<QuotaSnapsho
             None => p,
         }
     });
-    Ok(QuotaSnapshot { plan, windows, fetched_at })
+    Ok(QuotaSnapshot {
+        plan,
+        windows,
+        fetched_at,
+    })
 }
 
 pub struct CodexProvider {
@@ -71,7 +75,10 @@ pub struct CodexProvider {
 
 impl CodexProvider {
     pub fn new(home: PathBuf) -> Self {
-        Self { base_url: "https://chatgpt.com".into(), home }
+        Self {
+            base_url: "https://chatgpt.com".into(),
+            home,
+        }
     }
 
     pub async fn fetch_quota(

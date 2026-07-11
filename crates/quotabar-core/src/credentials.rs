@@ -38,7 +38,12 @@ pub fn claude_token(home: &Path) -> Result<Token, ProviderError> {
         .get("subscriptionType")
         .and_then(|t| t.as_str())
         .map(str::to_string);
-    Ok(Token { bearer, expires_at, plan_hint, account_id: None })
+    Ok(Token {
+        bearer,
+        expires_at,
+        plan_hint,
+        account_id: None,
+    })
 }
 
 pub fn codex_token(home: &Path) -> Result<Token, ProviderError> {
@@ -55,7 +60,12 @@ pub fn codex_token(home: &Path) -> Result<Token, ProviderError> {
         .get("account_id")
         .and_then(|t| t.as_str())
         .map(str::to_string);
-    Ok(Token { bearer, expires_at: None, plan_hint: None, account_id })
+    Ok(Token {
+        bearer,
+        expires_at: None,
+        plan_hint: None,
+        account_id,
+    })
 }
 
 pub fn grok_token(home: &Path) -> Result<Token, ProviderError> {
@@ -78,7 +88,12 @@ pub fn grok_token(home: &Path) -> Result<Token, ProviderError> {
         .and_then(|t| t.as_str())
         .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
         .map(|d| d.with_timezone(&Utc));
-    Ok(Token { bearer, expires_at, plan_hint: None, account_id: None })
+    Ok(Token {
+        bearer,
+        expires_at,
+        plan_hint: None,
+        account_id: None,
+    })
 }
 
 #[cfg(test)]
@@ -97,7 +112,10 @@ mod tests {
     #[test]
     fn claude_missing_file_is_no_credentials() {
         let dir = tempfile::tempdir().unwrap();
-        assert!(matches!(claude_token(dir.path()), Err(ProviderError::NoCredentials)));
+        assert!(matches!(
+            claude_token(dir.path()),
+            Err(ProviderError::NoCredentials)
+        ));
     }
 
     #[test]
@@ -115,7 +133,10 @@ mod tests {
     #[test]
     fn claude_garbage_is_schema_changed() {
         let dir = home_with(".claude/.credentials.json", "not json");
-        assert!(matches!(claude_token(dir.path()), Err(ProviderError::SchemaChanged(_))));
+        assert!(matches!(
+            claude_token(dir.path()),
+            Err(ProviderError::SchemaChanged(_))
+        ));
     }
 
     #[test]
@@ -144,6 +165,9 @@ mod tests {
     #[test]
     fn grok_no_xai_entry_is_schema_changed() {
         let dir = home_with(".grok/auth.json", r#"{"https://other::1":{"key":"k"}}"#);
-        assert!(matches!(grok_token(dir.path()), Err(ProviderError::SchemaChanged(_))));
+        assert!(matches!(
+            grok_token(dir.path()),
+            Err(ProviderError::SchemaChanged(_))
+        ));
     }
 }

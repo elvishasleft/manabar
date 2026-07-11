@@ -10,7 +10,9 @@ pub fn parse_file(text: &str, _mtime: DateTime<Utc>) -> Vec<UsageEvent> {
     let mut current_model = "unknown".to_string();
     let mut events = Vec::new();
     for line in text.lines() {
-        let Ok(v) = serde_json::from_str::<serde_json::Value>(line) else { continue };
+        let Ok(v) = serde_json::from_str::<serde_json::Value>(line) else {
+            continue;
+        };
         let payload = &v["payload"];
         match payload.get("type").and_then(|t| t.as_str()) {
             Some("turn_context") => {
@@ -54,10 +56,14 @@ mod tests {
     use chrono::Utc;
 
     const LINES: &str = concat!(
-        r#"{"timestamp":"2026-07-11T02:24:31.000Z","type":"turn_context","payload":{"type":"turn_context","model":"gpt-5.6-sol"}}"#, "\n",
-        r#"{"timestamp":"2026-07-11T02:25:12.681Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":25161,"cached_input_tokens":10496,"output_tokens":12,"reasoning_output_tokens":0,"total_tokens":25173}}}}"#, "\n",
-        r#"{"timestamp":"2026-07-11T02:26:00.000Z","type":"event_msg","payload":{"type":"token_count","info":null}}"#, "\n",
-        r#"{"timestamp":"2026-07-11T02:27:00.000Z","type":"event_msg","payload":{"type":"agent_message"}}"#, "\n",
+        r#"{"timestamp":"2026-07-11T02:24:31.000Z","type":"turn_context","payload":{"type":"turn_context","model":"gpt-5.6-sol"}}"#,
+        "\n",
+        r#"{"timestamp":"2026-07-11T02:25:12.681Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":25161,"cached_input_tokens":10496,"output_tokens":12,"reasoning_output_tokens":0,"total_tokens":25173}}}}"#,
+        "\n",
+        r#"{"timestamp":"2026-07-11T02:26:00.000Z","type":"event_msg","payload":{"type":"token_count","info":null}}"#,
+        "\n",
+        r#"{"timestamp":"2026-07-11T02:27:00.000Z","type":"event_msg","payload":{"type":"agent_message"}}"#,
+        "\n",
     );
 
     #[test]

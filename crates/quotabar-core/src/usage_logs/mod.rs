@@ -46,7 +46,13 @@ fn fold_events(events: &[UsageEvent], prices: &PriceTable) -> HashMap<NaiveDate,
         d.input_tokens += e.input_tokens + e.cache_read_tokens + e.cache_write_tokens;
         d.output_tokens += e.output_tokens;
         if let Some(p) = prices.price_for(&e.model) {
-            d.cost_usd += cost_usd(p, e.input_tokens, e.cache_read_tokens, e.cache_write_tokens, e.output_tokens);
+            d.cost_usd += cost_usd(
+                p,
+                e.input_tokens,
+                e.cache_read_tokens,
+                e.cache_write_tokens,
+                e.output_tokens,
+            );
             d.cost_known = true;
         }
     }
@@ -69,17 +75,24 @@ pub fn aggregate_dir(
                 continue;
             }
             let Ok(meta) = entry.metadata() else { continue };
-            let mtime: DateTime<Utc> =
-                meta.modified().map(DateTime::from).unwrap_or_else(|_| Utc::now());
+            let mtime: DateTime<Utc> = meta
+                .modified()
+                .map(DateTime::from)
+                .unwrap_or_else(|_| Utc::now());
             let (mtime_ms, len) = (mtime.timestamp_millis(), meta.len());
             let days = match cache.files.get(path) {
                 Some(f) if f.mtime_ms == mtime_ms && f.len == len => f.days.clone(),
                 _ => {
                     let text = std::fs::read_to_string(path).unwrap_or_default();
                     let days = fold_events(&parse(&text, mtime), prices);
-                    cache
-                        .files
-                        .insert(path.to_path_buf(), FileEntry { mtime_ms, len, days: days.clone() });
+                    cache.files.insert(
+                        path.to_path_buf(),
+                        FileEntry {
+                            mtime_ms,
+                            len,
+                            days: days.clone(),
+                        },
+                    );
                     days
                 }
             };
@@ -150,7 +163,12 @@ mod tests {
         PriceTable {
             entries: vec![(
                 "model-a".into(),
-                Price { input: 3.0, output: 15.0, cache_read: 0.3, cache_write: 3.75 },
+                Price {
+                    input: 3.0,
+                    output: 15.0,
+                    cache_read: 0.3,
+                    cache_write: 3.75,
+                },
             )],
         }
     }
@@ -165,9 +183,19 @@ mod tests {
         )
         .unwrap();
         let mut cache = LogCache::default();
-        let stats = aggregate_dir(&mut cache, dir.path(), any_log, test_parse, &priced(), today);
+        let stats = aggregate_dir(
+            &mut cache,
+            dir.path(),
+            any_log,
+            test_parse,
+            &priced(),
+            today,
+        );
         assert_eq!(stats.days.len(), 7);
-        assert_eq!(stats.days[0].date, NaiveDate::from_ymd_opt(2026, 7, 5).unwrap());
+        assert_eq!(
+            stats.days[0].date,
+            NaiveDate::from_ymd_opt(2026, 7, 5).unwrap()
+        );
         let d11 = &stats.days[6];
         assert_eq!(d11.date, today);
         assert_eq!(d11.input_tokens, 100 + 200 + 300 + 400);
@@ -192,25 +220,57 @@ mod tests {
             today,
         );
         assert_eq!(stats.days.len(), 7);
-        assert!(stats.days.iter().all(|d| d.input_tokens == 0 && d.output_tokens == 0));
+        assert!(stats
+            .days
+            .iter()
+            .all(|d| d.input_tokens == 0 && d.output_tokens == 0));
     }
 
     #[test]
     fn unchanged_files_are_not_reparsed() {
         let dir = tempfile::tempdir().unwrap();
         let today = NaiveDate::from_ymd_opt(2026, 7, 11).unwrap();
-        fs::write(dir.path().join("a.log"), "2026-07-11T08:00:00Z|model-a|1|0|0|1\n").unwrap();
+        fs::write(
+            dir.path().join("a.log"),
+            "2026-07-11T08:00:00Z|model-a|1|0|0|1\n",
+        )
+        .unwrap();
         let mut cache = LogCache::default();
         let before = CACHE_TEST_CALLS.load(Ordering::SeqCst);
-        aggregate_dir(&mut cache, dir.path(), any_log, counting_parse, &priced(), today);
-        aggregate_dir(&mut cache, dir.path(), any_log, counting_parse, &priced(), today);
-        assert_eq!(CACHE_TEST_CALLS.load(Ordering::SeqCst) - before, 1, "second pass must hit cache");
+        aggregate_dir(
+            &mut cache,
+            dir.path(),
+            any_log,
+            counting_parse,
+            &priced(),
+            today,
+        );
+        aggregate_dir(
+            &mut cache,
+            dir.path(),
+            any_log,
+            counting_parse,
+            &priced(),
+            today,
+        );
+        assert_eq!(
+            CACHE_TEST_CALLS.load(Ordering::SeqCst) - before,
+            1,
+            "second pass must hit cache"
+        );
         fs::write(
             dir.path().join("a.log"),
             "2026-07-11T08:00:00Z|model-a|1|0|0|1\n2026-07-11T09:00:00Z|model-a|2|0|0|2\n",
         )
         .unwrap();
-        let stats = aggregate_dir(&mut cache, dir.path(), any_log, counting_parse, &priced(), today);
+        let stats = aggregate_dir(
+            &mut cache,
+            dir.path(),
+            any_log,
+            counting_parse,
+            &priced(),
+            today,
+        );
         assert_eq!(CACHE_TEST_CALLS.load(Ordering::SeqCst) - before, 2);
         assert_eq!(stats.days[6].input_tokens, 3);
     }

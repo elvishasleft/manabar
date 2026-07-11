@@ -68,8 +68,16 @@ mod tests {
         let snap = QuotaSnapshot {
             plan: None,
             windows: vec![
-                RateWindow { label: "5h".into(), used_percent: 20.0, resets_at: None },
-                RateWindow { label: "Weekly".into(), used_percent: 65.0, resets_at: None },
+                RateWindow {
+                    label: "5h".into(),
+                    used_percent: 20.0,
+                    resets_at: None,
+                },
+                RateWindow {
+                    label: "Weekly".into(),
+                    used_percent: 65.0,
+                    resets_at: None,
+                },
             ],
             fetched_at: Utc::now(),
         };
@@ -78,18 +86,37 @@ mod tests {
 
     #[test]
     fn binding_none_when_no_windows() {
-        let snap = QuotaSnapshot { plan: None, windows: vec![], fetched_at: Utc::now() };
+        let snap = QuotaSnapshot {
+            plan: None,
+            windows: vec![],
+            fetched_at: Utc::now(),
+        };
         assert_eq!(snap.binding_remaining_percent(), None);
     }
 
     #[test]
     fn countdown_formats() {
         let now = Utc.with_ymd_and_hms(2026, 7, 11, 12, 0, 0).unwrap();
-        assert_eq!(format_countdown(now, now + chrono::Duration::minutes(134)), "2h 14m");
-        assert_eq!(format_countdown(now, now + chrono::Duration::hours(76)), "3d 4h");
-        assert_eq!(format_countdown(now, now + chrono::Duration::seconds(59)), "under 1m");
-        assert_eq!(format_countdown(now, now - chrono::Duration::seconds(5)), "now");
-        assert_eq!(format_countdown(now, now + chrono::Duration::minutes(9)), "9m");
+        assert_eq!(
+            format_countdown(now, now + chrono::Duration::minutes(134)),
+            "2h 14m"
+        );
+        assert_eq!(
+            format_countdown(now, now + chrono::Duration::hours(76)),
+            "3d 4h"
+        );
+        assert_eq!(
+            format_countdown(now, now + chrono::Duration::seconds(59)),
+            "under 1m"
+        );
+        assert_eq!(
+            format_countdown(now, now - chrono::Duration::seconds(5)),
+            "now"
+        );
+        assert_eq!(
+            format_countdown(now, now + chrono::Duration::minutes(9)),
+            "9m"
+        );
     }
 
     #[test]

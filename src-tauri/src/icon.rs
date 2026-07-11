@@ -83,7 +83,11 @@ mod tests {
         let buf = render_tray_icon([Some(100.0), None, Some(5.0)]);
         assert_eq!(px(&buf, 6, 28), GREEN, "full bar bottom is green");
         assert_eq!(px(&buf, 6, 3), GREEN, "full bar reaches the top");
-        assert_eq!(px(&buf, 16, 15), GRAY, "missing provider renders dim gray full bar");
+        assert_eq!(
+            px(&buf, 16, 15),
+            GRAY,
+            "missing provider renders dim gray full bar"
+        );
         assert_eq!(px(&buf, 26, 28), RED, "5% remaining renders red");
         assert_eq!(px(&buf, 26, 5), TRACK, "top of low bar is just track");
     }

@@ -165,7 +165,11 @@ mod tests {
     fn snap(used: f64) -> QuotaSnapshot {
         QuotaSnapshot {
             plan: None,
-            windows: vec![RateWindow { label: "5h".into(), used_percent: used, resets_at: None }],
+            windows: vec![RateWindow {
+                label: "5h".into(),
+                used_percent: used,
+                resets_at: None,
+            }],
             fetched_at: Utc::now(),
         }
     }
@@ -210,6 +214,13 @@ mod tests {
     fn default_providers_order_is_claude_codex_grok() {
         let ps = default_providers(std::path::PathBuf::from("C:/nonexistent"));
         let kinds: Vec<ProviderKind> = ps.iter().map(|p| p.kind()).collect();
-        assert_eq!(kinds, vec![ProviderKind::Claude, ProviderKind::Codex, ProviderKind::Grok]);
+        assert_eq!(
+            kinds,
+            vec![
+                ProviderKind::Claude,
+                ProviderKind::Codex,
+                ProviderKind::Grok
+            ]
+        );
     }
 }

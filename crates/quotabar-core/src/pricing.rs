@@ -11,9 +11,7 @@ pub struct PriceTable {
 
 impl PriceTable {
     pub fn empty() -> Self {
-        Self {
-            entries: vec![],
-        }
+        Self { entries: vec![] }
     }
 
     pub fn price_for(&self, model: &str) -> Option<&Price> {
@@ -25,7 +23,15 @@ impl PriceTable {
 
     pub fn default_table() -> Self {
         let e = |k: &str, input: f64, output: f64, cache_read: f64, cache_write: f64| {
-            (k.to_string(), Price { input, output, cache_read, cache_write })
+            (
+                k.to_string(),
+                Price {
+                    input,
+                    output,
+                    cache_read,
+                    cache_write,
+                },
+            )
         };
         Self {
             entries: vec![
@@ -57,7 +63,10 @@ mod tests {
         let t = PriceTable::default_table();
         let opus = t.price_for("claude-opus-4-8").unwrap();
         let generic = t.price_for("claude-fable-5").unwrap();
-        assert!(opus.output > generic.output, "opus must not fall through to generic claude");
+        assert!(
+            opus.output > generic.output,
+            "opus must not fall through to generic claude"
+        );
     }
 
     #[test]
@@ -67,7 +76,12 @@ mod tests {
 
     #[test]
     fn cost_is_per_million() {
-        let p = Price { input: 3.0, output: 15.0, cache_read: 0.3, cache_write: 3.75 };
+        let p = Price {
+            input: 3.0,
+            output: 15.0,
+            cache_read: 0.3,
+            cache_write: 3.75,
+        };
         let c = cost_usd(&p, 1_000_000, 0, 0, 0);
         assert!((c - 3.0).abs() < 1e-9);
         let c2 = cost_usd(&p, 0, 2_000_000, 0, 1_000_000);

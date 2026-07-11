@@ -61,7 +61,11 @@ pub fn parse_billing(
             resets_at: None,
         });
     }
-    Ok(QuotaSnapshot { plan, windows, fetched_at })
+    Ok(QuotaSnapshot {
+        plan,
+        windows,
+        fetched_at,
+    })
 }
 
 pub struct GrokProvider {
@@ -71,7 +75,10 @@ pub struct GrokProvider {
 
 impl GrokProvider {
     pub fn new(home: PathBuf) -> Self {
-        Self { base_url: "https://cli-chat-proxy.grok.com".into(), home }
+        Self {
+            base_url: "https://cli-chat-proxy.grok.com".into(),
+            home,
+        }
     }
 
     pub async fn fetch_quota(

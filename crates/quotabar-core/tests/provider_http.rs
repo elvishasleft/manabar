@@ -30,13 +30,17 @@ async fn get_json_passes_through_error_statuses() {
         .respond_with(ResponseTemplate::new(401))
         .mount(&server)
         .await;
-    let (status, _) = get_json(&client(), &format!("{}/x", server.uri()), &[]).await.unwrap();
+    let (status, _) = get_json(&client(), &format!("{}/x", server.uri()), &[])
+        .await
+        .unwrap();
     assert_eq!(status, 401);
 }
 
 #[tokio::test]
 async fn get_json_maps_connect_failure_to_network() {
-    let err = get_json(&client(), "http://127.0.0.1:1/x", &[]).await.unwrap_err();
+    let err = get_json(&client(), "http://127.0.0.1:1/x", &[])
+        .await
+        .unwrap_err();
     assert!(matches!(err, ProviderError::Network(_)));
 }
 
@@ -47,8 +51,8 @@ fn fake_home_with_claude_creds(expires_in_mins: i64) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let creds_dir = dir.path().join(".claude");
     fs::create_dir_all(&creds_dir).unwrap();
-    let expires_ms = (chrono::Utc::now() + chrono::Duration::minutes(expires_in_mins))
-        .timestamp_millis();
+    let expires_ms =
+        (chrono::Utc::now() + chrono::Duration::minutes(expires_in_mins)).timestamp_millis();
     fs::write(
         creds_dir.join(".credentials.json"),
         format!(
@@ -65,11 +69,16 @@ async fn claude_fetch_happy_path() {
     Mock::given(method("GET"))
         .and(path("/api/oauth/usage"))
         .and(header("anthropic-beta", "oauth-2025-04-20"))
-        .respond_with(ResponseTemplate::new(200).set_body_string(include_str!("fixtures/claude_usage.json")))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_string(include_str!("fixtures/claude_usage.json")),
+        )
         .mount(&server)
         .await;
     let home = fake_home_with_claude_creds(60);
-    let p = ClaudeProvider { base_url: server.uri(), home: home.path().to_path_buf() };
+    let p = ClaudeProvider {
+        base_url: server.uri(),
+        home: home.path().to_path_buf(),
+    };
     let snap = p.fetch_quota(&client()).await.unwrap();
     assert_eq!(snap.windows.len(), 3);
 }
@@ -82,8 +91,14 @@ async fn claude_401_maps_to_token_expired() {
         .mount(&server)
         .await;
     let home = fake_home_with_claude_creds(60);
-    let p = ClaudeProvider { base_url: server.uri(), home: home.path().to_path_buf() };
-    assert!(matches!(p.fetch_quota(&client()).await, Err(ProviderError::TokenExpired)));
+    let p = ClaudeProvider {
+        base_url: server.uri(),
+        home: home.path().to_path_buf(),
+    };
+    assert!(matches!(
+        p.fetch_quota(&client()).await,
+        Err(ProviderError::TokenExpired)
+    ));
 }
 
 #[tokio::test]
@@ -91,8 +106,14 @@ async fn claude_expired_file_token_skips_http() {
     let server = MockServer::start().await;
     // no mock mounted: a request would return 404 -> Network, so TokenExpired proves no call happened
     let home = fake_home_with_claude_creds(-5);
-    let p = ClaudeProvider { base_url: server.uri(), home: home.path().to_path_buf() };
-    assert!(matches!(p.fetch_quota(&client()).await, Err(ProviderError::TokenExpired)));
+    let p = ClaudeProvider {
+        base_url: server.uri(),
+        home: home.path().to_path_buf(),
+    };
+    assert!(matches!(
+        p.fetch_quota(&client()).await,
+        Err(ProviderError::TokenExpired)
+    ));
 }
 
 #[tokio::test]
@@ -103,8 +124,14 @@ async fn claude_malformed_body_is_schema_changed() {
         .mount(&server)
         .await;
     let home = fake_home_with_claude_creds(60);
-    let p = ClaudeProvider { base_url: server.uri(), home: home.path().to_path_buf() };
-    assert!(matches!(p.fetch_quota(&client()).await, Err(ProviderError::SchemaChanged(_))));
+    let p = ClaudeProvider {
+        base_url: server.uri(),
+        home: home.path().to_path_buf(),
+    };
+    assert!(matches!(
+        p.fetch_quota(&client()).await,
+        Err(ProviderError::SchemaChanged(_))
+    ));
 }
 
 use quotabar_core::providers::codex::CodexProvider;
@@ -127,11 +154,16 @@ async fn codex_fetch_happy_path_sends_account_header() {
     Mock::given(method("GET"))
         .and(path("/backend-api/wham/usage"))
         .and(header("chatgpt-account-id", "acct-1"))
-        .respond_with(ResponseTemplate::new(200).set_body_string(include_str!("fixtures/codex_usage.json")))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_string(include_str!("fixtures/codex_usage.json")),
+        )
         .mount(&server)
         .await;
     let home = fake_home_with_codex_creds();
-    let p = CodexProvider { base_url: server.uri(), home: home.path().to_path_buf() };
+    let p = CodexProvider {
+        base_url: server.uri(),
+        home: home.path().to_path_buf(),
+    };
     let snap = p.fetch_quota(&client()).await.unwrap();
     assert_eq!(snap.plan.as_deref(), Some("Free"));
 }
@@ -144,8 +176,14 @@ async fn codex_401_maps_to_token_expired() {
         .mount(&server)
         .await;
     let home = fake_home_with_codex_creds();
-    let p = CodexProvider { base_url: server.uri(), home: home.path().to_path_buf() };
-    assert!(matches!(p.fetch_quota(&client()).await, Err(ProviderError::TokenExpired)));
+    let p = CodexProvider {
+        base_url: server.uri(),
+        home: home.path().to_path_buf(),
+    };
+    assert!(matches!(
+        p.fetch_quota(&client()).await,
+        Err(ProviderError::TokenExpired)
+    ));
 }
 
 use quotabar_core::providers::grok::GrokProvider;
@@ -168,16 +206,24 @@ async fn grok_fetch_happy_path_with_plan_from_settings() {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .and(path("/v1/settings"))
-        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"subscription_tier_display":"X Premium+"}"#))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(r#"{"subscription_tier_display":"X Premium+"}"#),
+        )
         .mount(&server)
         .await;
     Mock::given(method("GET"))
         .and(path("/v1/billing"))
-        .respond_with(ResponseTemplate::new(200).set_body_string(include_str!("fixtures/grok_billing.json")))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_string(include_str!("fixtures/grok_billing.json")),
+        )
         .mount(&server)
         .await;
     let home = fake_home_with_grok_creds();
-    let p = GrokProvider { base_url: server.uri(), home: home.path().to_path_buf() };
+    let p = GrokProvider {
+        base_url: server.uri(),
+        home: home.path().to_path_buf(),
+    };
     let snap = p.fetch_quota(&client()).await.unwrap();
     assert_eq!(snap.plan.as_deref(), Some("X Premium+"));
     assert_eq!(snap.windows[0].used_percent, 4.0);
@@ -193,11 +239,16 @@ async fn grok_settings_failure_does_not_fail_quota() {
         .await;
     Mock::given(method("GET"))
         .and(path("/v1/billing"))
-        .respond_with(ResponseTemplate::new(200).set_body_string(include_str!("fixtures/grok_billing.json")))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_string(include_str!("fixtures/grok_billing.json")),
+        )
         .mount(&server)
         .await;
     let home = fake_home_with_grok_creds();
-    let p = GrokProvider { base_url: server.uri(), home: home.path().to_path_buf() };
+    let p = GrokProvider {
+        base_url: server.uri(),
+        home: home.path().to_path_buf(),
+    };
     let snap = p.fetch_quota(&client()).await.unwrap();
     assert!(snap.plan.is_none());
     assert_eq!(snap.windows.len(), 1);
@@ -211,6 +262,12 @@ async fn grok_401_maps_to_token_expired() {
         .mount(&server)
         .await;
     let home = fake_home_with_grok_creds();
-    let p = GrokProvider { base_url: server.uri(), home: home.path().to_path_buf() };
-    assert!(matches!(p.fetch_quota(&client()).await, Err(ProviderError::TokenExpired)));
+    let p = GrokProvider {
+        base_url: server.uri(),
+        home: home.path().to_path_buf(),
+    };
+    assert!(matches!(
+        p.fetch_quota(&client()).await,
+        Err(ProviderError::TokenExpired)
+    ));
 }

@@ -22,16 +22,27 @@ pub fn tooltip_string(views: &[ProviderView]) -> String {
 }
 
 fn remaining_array(views: &[ProviderView]) -> [Option<f64>; 3] {
-    let get =
-        |k: ProviderKind| views.iter().find(|v| v.kind == k).and_then(|v| v.remaining_percent);
-    [get(ProviderKind::Claude), get(ProviderKind::Codex), get(ProviderKind::Grok)]
+    let get = |k: ProviderKind| {
+        views
+            .iter()
+            .find(|v| v.kind == k)
+            .and_then(|v| v.remaining_percent)
+    };
+    [
+        get(ProviderKind::Claude),
+        get(ProviderKind::Codex),
+        get(ProviderKind::Grok),
+    ]
 }
 
 pub fn update_tray(app: &tauri::AppHandle, views: &[ProviderView]) {
     if let Some(tray) = app.tray_by_id("main") {
         let rgba = crate::icon::render_tray_icon(remaining_array(views));
-        let _ =
-            tray.set_icon(Some(Image::new_owned(rgba, crate::icon::ICON_SIZE, crate::icon::ICON_SIZE)));
+        let _ = tray.set_icon(Some(Image::new_owned(
+            rgba,
+            crate::icon::ICON_SIZE,
+            crate::icon::ICON_SIZE,
+        )));
         let _ = tray.set_tooltip(Some(tooltip_string(views)));
     }
 }
@@ -52,13 +63,25 @@ pub fn toggle_panel(app: &tauri::AppHandle) {
 pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     let refresh = MenuItem::with_id(app, "refresh", "Refresh now", true, None::<&str>)?;
     let auto_on = app.autolaunch().is_enabled().unwrap_or(false);
-    let autostart =
-        CheckMenuItem::with_id(app, "autostart", "Start with Windows", true, auto_on, None::<&str>)?;
+    let autostart = CheckMenuItem::with_id(
+        app,
+        "autostart",
+        "Start with Windows",
+        true,
+        auto_on,
+        None::<&str>,
+    )?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let menu = MenuBuilder::new(app).items(&[&refresh, &autostart, &quit]).build()?;
+    let menu = MenuBuilder::new(app)
+        .items(&[&refresh, &autostart, &quit])
+        .build()?;
     let rgba = crate::icon::render_tray_icon([None, None, None]);
     TrayIconBuilder::with_id("main")
-        .icon(Image::new_owned(rgba, crate::icon::ICON_SIZE, crate::icon::ICON_SIZE))
+        .icon(Image::new_owned(
+            rgba,
+            crate::icon::ICON_SIZE,
+            crate::icon::ICON_SIZE,
+        ))
         .tooltip("QuotaBar — starting…")
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -108,6 +131,9 @@ mod tests {
         let mut v3 = initial_view(ProviderKind::Grok);
         v3.remaining_percent = Some(95.0);
         v3.health = Health::Green;
-        assert_eq!(tooltip_string(&[v1, v2, v3]), "Claude 82% · Codex — · Grok 95%");
+        assert_eq!(
+            tooltip_string(&[v1, v2, v3]),
+            "Claude 82% · Codex — · Grok 95%"
+        );
     }
 }

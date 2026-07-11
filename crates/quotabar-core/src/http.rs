@@ -34,5 +34,7 @@ pub async fn get_json(
             Err(e) => last_err = Some(e),
         }
     }
-    Err(ProviderError::Network(last_err.map(|e| e.to_string()).unwrap_or_default()))
+    Err(ProviderError::Network(
+        last_err.map(|e| e.to_string()).unwrap_or_default(),
+    ))
 }

@@ -92,16 +92,21 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(
             tauri_plugin_log::Builder::new()
-                .target(tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
-                    file_name: Some("quotabar".into()),
-                }))
+                .target(tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::LogDir {
+                        file_name: Some("quotabar".into()),
+                    },
+                ))
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepOne)
                 .max_file_size(1_000_000)
                 .level(log::LevelFilter::Info)
                 .build(),
         )
         .plugin(tauri_plugin_positioner::init())
-        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .invoke_handler(tauri::generate_handler![
             commands::get_state,
             commands::refresh_now,
