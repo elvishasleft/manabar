@@ -96,9 +96,11 @@ mod tests {
     fn roundtrips_and_survives_garbage() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("config.json");
-        let mut cfg = Config::default();
-        cfg.poll_interval_secs = 600;
-        cfg.enabled.codex = false;
+        let cfg = Config {
+            poll_interval_secs: 600,
+            enabled: Enabled { codex: false, ..Enabled::default() },
+            ..Config::default()
+        };
         save(&path, &cfg).unwrap();
         assert_eq!(load(&path), cfg);
         std::fs::write(&path, "garbage{{{").unwrap();
