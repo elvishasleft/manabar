@@ -73,10 +73,12 @@ GitHub Releases instead.
 
 ## Configuration
 
-QuotaBar reads `%APPDATA%\quotabar\config.json` on startup (created with
-defaults on first run if missing; invalid JSON falls back to defaults
+QuotaBar reads `%APPDATA%\quotabar\config.json` once at startup (created
+with defaults on first run if missing; invalid JSON falls back to defaults
 rather than crashing). There is no in-app settings UI in v1 — edit the
-file and restart, or use `Refresh now` after a poll-interval change.
+file and restart QuotaBar for changes (including `poll_interval_secs`) to
+take effect. `Refresh now` does not reload config; it only triggers an
+immediate extra poll using the interval already in memory.
 
 ```json
 {
@@ -113,7 +115,7 @@ the same unofficial usage endpoints those CLIs use internally:
 | Provider | Credentials (read-only) | Quota endpoint | Cumulative usage source |
 |---|---|---|---|
 | Claude Code | `%USERPROFILE%\.claude\.credentials.json` | `GET https://api.anthropic.com/api/oauth/usage` (Bearer token + `anthropic-beta: oauth-2025-04-20`) — `five_hour`, `seven_day`, `seven_day_sonnet`, `seven_day_opus`, `extra_usage`; plan from `subscriptionType` | `%USERPROFILE%\.claude\projects\**\*.jsonl` |
-| Codex CLI | `%USERPROFILE%\.codex\auth.json` (or `$CODEX_HOME`) | `GET https://chatgpt.com/backend-api/wham/usage` (Bearer token) — `rate_limit.primary_window` (5h), `secondary_window` (weekly), `additional_rate_limits[]` (per-model, paid plans) | `%USERPROFILE%\.codex\sessions\**\*.jsonl` |
+| Codex CLI | `%USERPROFILE%\.codex\auth.json`, or `$CODEX_HOME\auth.json` when the `CODEX_HOME` environment variable is set | `GET https://chatgpt.com/backend-api/wham/usage` (Bearer token) — `rate_limit.primary_window` (5h), `secondary_window` (weekly), `additional_rate_limits[]` (per-model, paid plans) | `%USERPROFILE%\.codex\sessions\**\*.jsonl` |
 | Grok CLI | `%USERPROFILE%\.grok\auth.json` (keyed by `issuer::client_id`, token field `key`) | `GET https://cli-chat-proxy.grok.com/v1/billing?format=credits` (`config.creditUsagePercent`, `currentPeriod.end`) + `GET .../v1/settings` (plan label) | `%USERPROFILE%\.grok\sessions\**\signals.json` (`contextTokensUsed`, `primaryModelId`) |
 
 All three endpoints are **unofficial** — reverse-engineered from the

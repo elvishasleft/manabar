@@ -46,8 +46,16 @@ pub fn claude_token(home: &Path) -> Result<Token, ProviderError> {
     })
 }
 
+fn codex_auth_path(home: &Path, codex_home_env: Option<&str>) -> std::path::PathBuf {
+    match codex_home_env {
+        Some(dir) if !dir.trim().is_empty() => std::path::PathBuf::from(dir).join("auth.json"),
+        _ => home.join(".codex").join("auth.json"),
+    }
+}
+
 pub fn codex_token(home: &Path) -> Result<Token, ProviderError> {
-    let v = read_json(&home.join(".codex").join("auth.json"))?;
+    let path = codex_auth_path(home, std::env::var("CODEX_HOME").ok().as_deref());
+    let v = read_json(&path)?;
     let tokens = v
         .get("tokens")
         .ok_or_else(|| ProviderError::SchemaChanged("missing tokens".into()))?;
@@ -137,6 +145,20 @@ mod tests {
             claude_token(dir.path()),
             Err(ProviderError::SchemaChanged(_))
         ));
+    }
+
+    #[test]
+    fn codex_auth_path_defaults_to_home_dotcodex() {
+        let p = codex_auth_path(std::path::Path::new("C:/Users/u"), None);
+        assert!(p.ends_with(std::path::Path::new(".codex/auth.json")));
+    }
+
+    #[test]
+    fn codex_auth_path_honors_codex_home() {
+        let p = codex_auth_path(std::path::Path::new("C:/Users/u"), Some("D:/codex-home"));
+        assert_eq!(p, std::path::Path::new("D:/codex-home").join("auth.json"));
+        let blank = codex_auth_path(std::path::Path::new("C:/Users/u"), Some("  "));
+        assert!(blank.ends_with(std::path::Path::new(".codex/auth.json")));
     }
 
     #[test]
