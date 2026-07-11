@@ -56,3 +56,15 @@ pub struct DayUsage {
 pub struct UsageStats {
     pub days: Vec<DayUsage>,
 }
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProviderView {
+    pub kind: ProviderKind,
+    pub health: Health,
+    pub remaining_percent: Option<f64>,
+    pub quota: Option<QuotaSnapshot>,
+    pub error: Option<String>,
+    pub error_kind: Option<String>,
+    pub usage: Option<UsageStats>,
+    pub updated_at: Option<DateTime<Utc>>,
+}
