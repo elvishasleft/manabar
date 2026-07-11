@@ -97,6 +97,18 @@ async fn poll_and_publish(app: &tauri::AppHandle) {
     let _ = app.emit("state", &views);
 }
 
+/// Maps a configured `poll_interval_secs` to the periodic-polling interval to use.
+///
+/// `0` means on-demand mode: no periodic background polling, refresh only on
+/// panel open or manual "Refresh now". Any other value is clamped to a
+/// minimum of 60 seconds, matching the existing config documentation.
+pub(crate) fn effective_poll_interval(secs: u64) -> Option<Duration> {
+    match secs {
+        0 => None,
+        s => Some(Duration::from_secs(s.max(60))),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -130,7 +142,7 @@ pub fn run() {
                 }
             }
             let home = dirs::home_dir().expect("home dir must exist");
-            let interval = cfg.poll_interval_secs.max(60);
+            let interval = effective_poll_interval(cfg.poll_interval_secs);
             app.manage(AppShared::new(cfg, home));
             tray::create_tray(app.handle())?;
             let handle = app.handle().clone();
@@ -138,9 +150,12 @@ pub fn run() {
                 loop {
                     poll_and_publish(&handle).await;
                     let shared = handle.state::<AppShared>();
-                    tokio::select! {
-                        _ = tokio::time::sleep(Duration::from_secs(interval)) => {},
-                        _ = shared.refresh.notified() => {},
+                    match interval {
+                        Some(d) => tokio::select! {
+                            _ = tokio::time::sleep(d) => {},
+                            _ = shared.refresh.notified() => {},
+                        },
+                        None => shared.refresh.notified().await,
                     }
                 }
             });
@@ -162,4 +177,27 @@ pub fn run() {
                 }
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn zero_means_on_demand_mode() {
+        assert_eq!(effective_poll_interval(0), None);
+    }
+
+    #[test]
+    fn below_minimum_clamps_to_60_seconds() {
+        assert_eq!(effective_poll_interval(1), Some(Duration::from_secs(60)));
+    }
+
+    #[test]
+    fn above_minimum_is_used_as_is() {
+        assert_eq!(
+            effective_poll_interval(1800),
+            Some(Duration::from_secs(1800))
+        );
+    }
 }
