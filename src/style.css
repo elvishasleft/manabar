@@ -1,29 +1,23 @@
 /* ==========================================================================
-   QuotaBar panel — "instrument readout" direction.
+   QuotaBar panel — "big-number dashboard" direction.
 
-   A 380x560 always-on-top tray flyout reads like a small telemetry panel,
-   not a web page: monospace tabular data for numbers, a plain UI face for
-   labels, one accent hue per provider (identity) kept strictly separate
-   from the red/amber/green health hue (meaning: quota remaining). Both
-   light and dark are designed on purpose via prefers-color-scheme, not
-   a plain invert.
+   Each provider is a single flat card: a ring gauge carries the headline
+   number (binding remaining %), identity is reduced to a small accent dot,
+   and everything else is quiet sans-serif text. No boxes-in-boxes, no
+   heavy borders, no monospace anywhere — numeric alignment comes from
+   font-variant-numeric instead. Both themes are tuned on purpose via
+   prefers-color-scheme, not a plain invert.
    ========================================================================== */
 
 :root {
   color-scheme: light dark;
 
-  /* type */
   --font-ui: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont,
     system-ui, sans-serif;
-  --font-mono: "Cascadia Mono", "Cascadia Code", Consolas, "SF Mono", ui-monospace,
-    "Courier New", monospace;
 
-  /* geometry */
-  --radius-card: 14px;
-  --radius-inset: 10px;
+  --radius-card: 12px;
   --radius-pill: 999px;
 
-  /* motion */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-fast: 150ms;
   --dur-med: 500ms;
@@ -40,33 +34,26 @@
   --accent-grok: #8b7cf0;
 
   /* light theme surfaces (default) */
-  --surface-app: #f3f1ec;
+  --surface-app: #f4f4f6;
   --surface-card: #ffffff;
-  --surface-card-2: #f6f4ef;
-  --border: rgba(23, 23, 20, 0.1);
-  --border-strong: rgba(23, 23, 20, 0.18);
+  --surface-card-hover: #fbfbfc;
+  --border: rgba(20, 20, 22, 0.08);
+  --border-strong: rgba(20, 20, 22, 0.16);
   --text-primary: #17181c;
   --text-muted: #6b6f76;
   --text-faint: #9a9da3;
-  --shadow-card: 0 1px 2px rgba(23, 23, 20, 0.05), 0 8px 20px -12px rgba(23, 23, 20, 0.28);
-  --shadow-card-hover: 0 1px 2px rgba(23, 23, 20, 0.06), 0 12px 26px -12px rgba(23, 23, 20, 0.34);
-  --noise-opacity: 0.025;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --surface-app: #121319;
-    --surface-card: #1b1d24;
-    --surface-card-2: #23262e;
-    --border: rgba(255, 255, 255, 0.075);
-    --border-strong: rgba(255, 255, 255, 0.16);
-    --text-primary: #eceef2;
-    --text-muted: #9298a3;
-    --text-faint: #676c76;
-    --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.045) inset, 0 10px 24px -12px rgba(0, 0, 0, 0.6);
-    --shadow-card-hover: 0 1px 0 rgba(255, 255, 255, 0.06) inset,
-      0 16px 30px -12px rgba(0, 0, 0, 0.68);
-    --noise-opacity: 0.045;
+    --surface-app: #0b0b0e;
+    --surface-card: #101014;
+    --surface-card-hover: #17171c;
+    --border: rgba(255, 255, 255, 0.07);
+    --border-strong: rgba(255, 255, 255, 0.15);
+    --text-primary: #ececf0;
+    --text-muted: #94969f;
+    --text-faint: #66686f;
   }
 }
 
@@ -81,38 +68,16 @@ body {
 }
 
 body {
-  position: relative;
   font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
   color: var(--text-primary);
-  background: radial-gradient(
-      130% 90% at 12% -12%,
-      color-mix(in srgb, var(--accent-claude) 7%, transparent),
-      transparent 55%
-    ),
-    radial-gradient(
-      130% 90% at 105% 0%,
-      color-mix(in srgb, var(--accent-codex) 6%, transparent),
-      transparent 55%
-    ),
-    var(--surface-app);
+  background: var(--surface-app);
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--text-primary) 16%, transparent) transparent;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-/* faint grain so the panel reads as a surface, not a flat web page */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: var(--noise-opacity);
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
 }
 
 ::selection {
@@ -126,7 +91,7 @@ body::before {
   border-radius: 4px;
 }
 
-/* thin, unobtrusive scrollbar for the 380x560 fixed viewport */
+/* thin, unobtrusive scrollbar for the 380x640 fixed viewport */
 body::-webkit-scrollbar {
   width: 8px;
 }
@@ -144,44 +109,27 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 #app {
-  position: relative;
-  z-index: 1;
-  padding: 14px 14px 18px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   min-height: 100%;
 }
 
 /* ---------------------------------- card --------------------------------- */
 
 .card {
-  position: relative;
   background: var(--surface-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
-  padding: 13px 15px 14px 18px;
-  box-shadow: var(--shadow-card);
-  overflow: hidden;
-  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out),
+  padding: 14px 16px;
+  transition: background-color var(--dur-fast) var(--ease-out),
     border-color var(--dur-fast) var(--ease-out), opacity var(--dur-med) var(--ease-out);
 }
 
 .card:hover {
-  transform: translateY(-1px);
+  background: var(--surface-card-hover);
   border-color: var(--border-strong);
-  box-shadow: var(--shadow-card-hover);
-}
-
-/* provider identity stripe — color says "which service", never "how much left" */
-.card::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--card-accent, var(--text-faint));
 }
 
 .card[data-kind="claude"] {
@@ -195,190 +143,183 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 .card.health-unavailable {
-  opacity: 0.7;
+  opacity: 0.85;
 }
 
-/* ---------------------------------- header -------------------------------- */
-
-.card header {
+.card-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 14px;
+}
+
+/* ---------------------------------- ring ---------------------------------- */
+
+.ring {
+  position: relative;
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+}
+
+.ring svg {
+  display: block;
+  transform: rotate(-90deg);
+}
+
+.ring-track {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-width: 5;
+}
+
+.ring-fill {
+  fill: none;
+  stroke-width: 5;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 700ms var(--ease-out);
+}
+
+.ring.health-green .ring-fill {
+  stroke: var(--health-green);
+}
+.ring.health-amber .ring-fill {
+  stroke: var(--health-amber);
+}
+.ring.health-red .ring-fill {
+  stroke: var(--health-red);
+}
+.ring.health-unavailable .ring-fill {
+  stroke: var(--health-gray);
+}
+
+.ring-num {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.ring.health-unavailable .ring-num {
+  color: var(--text-faint);
+  font-weight: 500;
+}
+
+/* -------------------------------- identity -------------------------------- */
+
+.identity {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.identity-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 5px;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--card-accent, var(--text-faint));
+  flex: 0 0 auto;
 }
 
 .card h2 {
   margin: 0;
   font-size: 14.5px;
-  font-weight: 650;
-  letter-spacing: 0.01em;
+  font-weight: 600;
   color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  gap: 7px;
   white-space: nowrap;
-}
-
-.card h2::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 2px;
-  background: var(--card-accent);
-  flex: 0 0 auto;
-}
-.card[data-kind="claude"] h2::before {
-  border-radius: 50%;
-}
-.card[data-kind="grok"] h2::before {
-  transform: rotate(45deg);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .plan {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 9.5px;
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--card-accent);
-  background: color-mix(in srgb, var(--card-accent) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--card-accent) 30%, transparent);
-  padding: 2px 8px;
+  color: var(--text-muted);
+  border: 1px solid var(--border-strong);
+  padding: 1.5px 6px 2px;
   border-radius: var(--radius-pill);
-  max-width: 40%;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.plan:empty {
-  display: none;
-}
-
-/* ---------------------------------- status -------------------------------- */
-
-.status.error {
-  margin-top: 9px;
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  font-size: 11.5px;
-  line-height: 1.4;
-  color: color-mix(in srgb, var(--health-red) 75%, var(--text-primary) 25%);
-  background: color-mix(in srgb, var(--health-red) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--health-red) 26%, transparent);
-  border-radius: 9px;
-  padding: 7px 9px;
-}
-
-.status.error::before {
-  content: "!";
-  flex: 0 0 auto;
-  width: 14px;
-  height: 14px;
-  margin-top: 1px;
-  border-radius: 50%;
-  background: var(--health-red);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 14px;
-  text-align: center;
+  max-width: 42%;
+  flex: 0 1 auto;
 }
 
 /* ------------------------------ rate windows ------------------------------ */
 
-.window {
-  margin-top: 10px;
-}
-
-.window-head {
+.windows {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
+  flex-direction: column;
+  gap: 3px;
 }
 
-.window-head span:first-child {
-  font-size: 10.5px;
-  font-weight: 650;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-
-.window-head span:last-child {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
-.bar {
-  position: relative;
-  height: 7px;
-  margin-top: 4px;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--text-primary) 9%, transparent);
-  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--text-primary) 12%, transparent);
-  overflow: hidden;
-}
-
-.bar-fill {
-  height: 100%;
-  border-radius: var(--radius-pill);
-  transition: width 700ms var(--ease-out);
-}
-
-.bar-fill.health-green {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--health-green) 82%, black 6%), var(--health-green));
-  box-shadow: 0 0 8px color-mix(in srgb, var(--health-green) 55%, transparent);
-}
-.bar-fill.health-amber {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--health-amber) 82%, black 6%), var(--health-amber));
-  box-shadow: 0 0 8px color-mix(in srgb, var(--health-amber) 55%, transparent);
-}
-.bar-fill.health-red {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--health-red) 82%, black 8%), var(--health-red));
-  box-shadow: 0 0 9px color-mix(in srgb, var(--health-red) 60%, transparent);
-}
-.bar-fill.health-unavailable {
-  background: var(--health-gray);
-  box-shadow: none;
-}
-
-/* ----------------------------- usage / trend ------------------------------ */
-
-.usage {
-  margin-top: 11px;
-  padding: 9px 10px 8px;
-  background: var(--surface-card-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-inset);
-}
-
-.usage-today {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.01em;
+.win-line {
+  font-size: 11.5px;
+  line-height: 1.35;
   color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.win-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  white-space: normal;
+  color: color-mix(in srgb, var(--health-red) 75%, var(--text-primary) 25%);
+}
+
+.err-icon {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+/* ---------------------------------- bottom --------------------------------- */
+
+.card-bottom {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.usage-line {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .spark {
+  flex: 0 0 auto;
   display: block;
-  width: 100%;
-  height: 28px;
-  margin-top: 6px;
+  width: 70px;
+  height: 20px;
   color: var(--card-accent);
 }
 .spark polyline {
   stroke: currentColor;
-  stroke-width: 1.6;
+  stroke-width: 1.4;
   stroke-linejoin: round;
   stroke-linecap: round;
-  opacity: 0.9;
+  opacity: 0.6;
   vector-effect: non-scaling-stroke;
 }
 
@@ -386,11 +327,12 @@ body::-webkit-scrollbar-thumb:hover {
 
 footer {
   margin-top: 2px;
-  padding-top: 8px;
+  padding-top: 6px;
   text-align: center;
-  font-size: 10.5px;
+  font-size: 10px;
   letter-spacing: 0.02em;
   color: var(--text-faint);
+  opacity: 0.85;
 }
 footer::before {
   content: "↻ ";

@@ -69,38 +69,71 @@ function sparkline(days: DayUsage[]): string {
   const max = Math.max(...vals, 1);
   const denom = Math.max(vals.length - 1, 1);
   const pts = vals
-    .map((v, i) => `${(i / denom) * 100},${28 - (v / max) * 26}`)
+    .map((v, i) => `${(i / denom) * 100},${18 - (v / max) * 16}`)
     .join(" ");
-  return `<svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" fill="none" /></svg>`;
+  return `<svg class="spark" viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" fill="none" /></svg>`;
+}
+
+// Ring gauge: a small donut showing the provider's binding remaining-percent.
+// `pct` is null when the provider is unavailable (no reading) — the ring then
+// renders as an empty gray track with a "—" label instead of a number.
+function ring(pct: number | null, health: View["health"]): string {
+  const size = 56;
+  const stroke = 5;
+  const r = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * r;
+  const known = pct != null;
+  const clamped = known ? Math.max(0, Math.min(100, pct)) : 0;
+  const offset = known ? circumference * (1 - clamped / 100) : circumference;
+  const label = known ? String(Math.round(clamped)) : "—";
+  return `
+    <div class="ring health-${health}">
+      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">
+        <circle class="ring-track" cx="${size / 2}" cy="${size / 2}" r="${r}"></circle>
+        <circle class="ring-fill" cx="${size / 2}" cy="${size / 2}" r="${r}"
+          stroke-dasharray="${circumference.toFixed(2)}"
+          stroke-dashoffset="${offset.toFixed(2)}"></circle>
+      </svg>
+      <span class="ring-num">${label}</span>
+    </div>`;
+}
+
+// One compact line per rate window: "5h · 97% left · resets in 2h 14m".
+// Parts are filtered so a window without a resets_at still reads cleanly.
+function windowLine(w: RateWindow): string {
+  const remaining = Math.round(100 - w.used_percent);
+  const parts = [esc(w.label), `${remaining}% left`, countdown(w.resets_at)].filter(Boolean);
+  return `<div class="win-line">${parts.join(" · ")}</div>`;
 }
 
 function card(v: View): string {
-  const windows = (v.quota?.windows ?? [])
-    .map(
-      (w) => `
-      <div class="window">
-        <div class="window-head"><span>${esc(w.label)}</span><span>${Math.round(100 - w.used_percent)}% left · ${countdown(w.resets_at)}</span></div>
-        <div class="bar"><div class="bar-fill health-${v.health}" style="width:${Math.min(w.used_percent, 100)}%"></div></div>
-      </div>`
-    )
-    .join("");
+  const windowsHtml = v.error_kind
+    ? `<div class="win-line win-error"><span class="err-icon" aria-hidden="true">⚠</span>${esc(errorCopy(v))}</div>`
+    : (v.quota?.windows ?? []).map(windowLine).join("");
   const today = v.usage?.days.at(-1);
   const cost = today?.est_cost_usd != null ? `$${today.est_cost_usd.toFixed(2)} est.` : "—";
-  const usageBlock =
+  const bottomRow =
     v.usage && today
-      ? `<div class="usage">
-           <div class="usage-today">Today: ${fmtTokens(today.input_tokens)} in · ${fmtTokens(today.output_tokens)} out · ${cost}</div>
+      ? `<div class="card-bottom">
+           <span class="usage-line">Today ${fmtTokens(today.input_tokens)} in · ${fmtTokens(today.output_tokens)} out · ${cost}</span>
            ${sparkline(v.usage.days)}
          </div>`
       : "";
-  const status = v.error_kind ? `<div class="status error">${esc(errorCopy(v))}</div>` : "";
+  const plan = v.quota?.plan ? `<span class="plan">${esc(v.quota.plan)}</span>` : "";
   return `
     <section class="card health-${v.health}" data-kind="${v.kind}">
-      <header>
-        <h2>${NAMES[v.kind]}</h2>
-        <span class="plan">${esc(v.quota?.plan ?? "")}</span>
-      </header>
-      ${status}${windows}${usageBlock}
+      <div class="card-top">
+        ${ring(v.remaining_percent, v.health)}
+        <div class="identity">
+          <div class="identity-row">
+            <span class="dot"></span>
+            <h2>${NAMES[v.kind]}</h2>
+            ${plan}
+          </div>
+          <div class="windows">${windowsHtml}</div>
+        </div>
+      </div>
+      ${bottomRow}
     </section>`;
 }
 
