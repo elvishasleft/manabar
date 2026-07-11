@@ -23,6 +23,9 @@ type View = {
 const NAMES: Record<View["kind"], string> = { claude: "Claude", codex: "Codex", grok: "Grok" };
 const CLI: Record<View["kind"], string> = { claude: "Claude Code", codex: "Codex", grok: "Grok" };
 
+const esc = (s: string) =>
+  s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+
 let current: View[] = [];
 
 const fmtTokens = (n: number) =>
@@ -64,8 +67,9 @@ function errorCopy(v: View): string {
 function sparkline(days: DayUsage[]): string {
   const vals = days.map((d) => d.input_tokens + d.output_tokens);
   const max = Math.max(...vals, 1);
+  const denom = Math.max(vals.length - 1, 1);
   const pts = vals
-    .map((v, i) => `${(i / (vals.length - 1)) * 100},${28 - (v / max) * 26}`)
+    .map((v, i) => `${(i / denom) * 100},${28 - (v / max) * 26}`)
     .join(" ");
   return `<svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" fill="none" /></svg>`;
 }
@@ -75,7 +79,7 @@ function card(v: View): string {
     .map(
       (w) => `
       <div class="window">
-        <div class="window-head"><span>${w.label}</span><span>${Math.round(100 - w.used_percent)}% left · ${countdown(w.resets_at)}</span></div>
+        <div class="window-head"><span>${esc(w.label)}</span><span>${Math.round(100 - w.used_percent)}% left · ${countdown(w.resets_at)}</span></div>
         <div class="bar"><div class="bar-fill health-${v.health}" style="width:${Math.min(w.used_percent, 100)}%"></div></div>
       </div>`
     )
@@ -89,12 +93,12 @@ function card(v: View): string {
            ${sparkline(v.usage.days)}
          </div>`
       : "";
-  const status = v.error_kind ? `<div class="status error">${errorCopy(v)}</div>` : "";
+  const status = v.error_kind ? `<div class="status error">${esc(errorCopy(v))}</div>` : "";
   return `
     <section class="card health-${v.health}" data-kind="${v.kind}">
       <header>
         <h2>${NAMES[v.kind]}</h2>
-        <span class="plan">${v.quota?.plan ?? ""}</span>
+        <span class="plan">${esc(v.quota?.plan ?? "")}</span>
       </header>
       ${status}${windows}${usageBlock}
     </section>`;
@@ -108,5 +112,5 @@ function render(views: View[]) {
 }
 
 listen<View[]>("state", (e) => render(e.payload));
-invoke<View[]>("panel_opened").then(render);
+invoke<View[]>("panel_opened").then(render).catch((e) => console.error("panel_opened failed", e));
 setInterval(() => current.length && render(current), 30_000);
