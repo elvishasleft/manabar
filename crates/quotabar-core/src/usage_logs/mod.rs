@@ -4,6 +4,8 @@ use chrono::{DateTime, Duration, NaiveDate, Utc};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+pub mod claude;
+
 #[derive(Debug, Clone)]
 pub struct UsageEvent {
     pub timestamp: DateTime<Utc>,
