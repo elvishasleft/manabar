@@ -47,14 +47,41 @@ pub fn update_tray(app: &tauri::AppHandle, views: &[ProviderView]) {
     }
 }
 
+/// Computes the top-left corner (in physical pixels) for placing the panel
+/// window at the bottom-right of a monitor's work area, leaving a fixed
+/// margin so the window doesn't touch the taskbar or screen edge.
+///
+/// `work_pos` / `work_size` describe the monitor's work area (the region
+/// excluding the taskbar); `win_size` is the panel window's own size. The
+/// result is clamped so the window never starts above/left of the work
+/// area's origin, which matters when the window is taller or wider than
+/// the work area itself.
+pub(crate) fn panel_position(
+    work_pos: (i32, i32),
+    work_size: (u32, u32),
+    win_size: (u32, u32),
+) -> (i32, i32) {
+    const MARGIN: i32 = 12;
+    let x = work_pos.0 + work_size.0 as i32 - win_size.0 as i32 - MARGIN;
+    let y = work_pos.1 + work_size.1 as i32 - win_size.1 as i32 - MARGIN;
+    (x.max(work_pos.0), y.max(work_pos.1))
+}
+
 pub fn toggle_panel(app: &tauri::AppHandle) {
     use tauri::Emitter;
-    use tauri_plugin_positioner::{Position, WindowExt};
     if let Some(w) = app.get_webview_window("panel") {
         if w.is_visible().unwrap_or(false) {
             let _ = w.hide();
         } else {
-            let _ = w.move_window(Position::TrayBottomCenter);
+            if let (Ok(Some(monitor)), Ok(win_size)) = (w.current_monitor(), w.outer_size()) {
+                let work_area = monitor.work_area();
+                let (x, y) = panel_position(
+                    (work_area.position.x, work_area.position.y),
+                    (work_area.size.width, work_area.size.height),
+                    (win_size.width, win_size.height),
+                );
+                let _ = w.set_position(tauri::PhysicalPosition::new(x, y));
+            }
             let _ = w.show();
             let _ = w.set_focus();
             let _ = app.emit("panel-shown", ());
@@ -104,7 +131,6 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
-            tauri_plugin_positioner::on_tray_event(tray.app_handle(), &event);
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
@@ -137,5 +163,35 @@ mod tests {
             tooltip_string(&[v1, v2, v3]),
             "Claude 82% · Codex — · Grok 95%"
         );
+    }
+
+    #[test]
+    fn panel_position_sits_bottom_right_above_taskbar() {
+        // Typical 1920x1032 work area (1920x1080 monitor, 48px taskbar) with
+        // a 380x560 panel: bottom-right corner minus the 12px margin.
+        let pos = panel_position((0, 0), (1920, 1032), (380, 560));
+        assert_eq!(pos, (1528, 460));
+    }
+
+    #[test]
+    fn panel_position_respects_non_zero_work_area_origin() {
+        // Secondary monitor to the right of the primary, work area origin
+        // is offset accordingly.
+        let pos = panel_position((1920, 0), (1920, 1032), (380, 560));
+        assert_eq!(pos, (3448, 460));
+    }
+
+    #[test]
+    fn panel_position_clamps_when_window_taller_than_work_area() {
+        // Window taller than the work area must clamp to the work area's
+        // origin rather than producing a negative/off-screen y.
+        let pos = panel_position((0, 0), (1920, 500), (380, 560));
+        assert_eq!(pos, (1528, 0));
+    }
+
+    #[test]
+    fn panel_position_clamps_when_window_wider_than_work_area() {
+        let pos = panel_position((0, 0), (300, 1032), (380, 560));
+        assert_eq!(pos, (0, 460));
     }
 }
