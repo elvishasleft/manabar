@@ -147,3 +147,70 @@ async fn codex_401_maps_to_token_expired() {
     let p = CodexProvider { base_url: server.uri(), home: home.path().to_path_buf() };
     assert!(matches!(p.fetch_quota(&client()).await, Err(ProviderError::TokenExpired)));
 }
+
+use quotabar_core::providers::grok::GrokProvider;
+
+fn fake_home_with_grok_creds() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path().join(".grok");
+    fs::create_dir_all(&d).unwrap();
+    let expires = (chrono::Utc::now() + chrono::Duration::days(3)).to_rfc3339();
+    fs::write(
+        d.join("auth.json"),
+        format!(r#"{{"https://auth.x.ai::client-1":{{"key":"tok-g","expires_at":"{expires}"}}}}"#),
+    )
+    .unwrap();
+    dir
+}
+
+#[tokio::test]
+async fn grok_fetch_happy_path_with_plan_from_settings() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/settings"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"subscription_tier_display":"X Premium+"}"#))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/v1/billing"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(include_str!("fixtures/grok_billing.json")))
+        .mount(&server)
+        .await;
+    let home = fake_home_with_grok_creds();
+    let p = GrokProvider { base_url: server.uri(), home: home.path().to_path_buf() };
+    let snap = p.fetch_quota(&client()).await.unwrap();
+    assert_eq!(snap.plan.as_deref(), Some("X Premium+"));
+    assert_eq!(snap.windows[0].used_percent, 4.0);
+}
+
+#[tokio::test]
+async fn grok_settings_failure_does_not_fail_quota() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/settings"))
+        .respond_with(ResponseTemplate::new(500))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/v1/billing"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(include_str!("fixtures/grok_billing.json")))
+        .mount(&server)
+        .await;
+    let home = fake_home_with_grok_creds();
+    let p = GrokProvider { base_url: server.uri(), home: home.path().to_path_buf() };
+    let snap = p.fetch_quota(&client()).await.unwrap();
+    assert!(snap.plan.is_none());
+    assert_eq!(snap.windows.len(), 1);
+}
+
+#[tokio::test]
+async fn grok_401_maps_to_token_expired() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(401))
+        .mount(&server)
+        .await;
+    let home = fake_home_with_grok_creds();
+    let p = GrokProvider { base_url: server.uri(), home: home.path().to_path_buf() };
+    assert!(matches!(p.fetch_quota(&client()).await, Err(ProviderError::TokenExpired)));
+}
