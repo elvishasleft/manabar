@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 pub mod claude;
 pub mod codex;
+pub mod grok;
 
 #[derive(Debug, Clone)]
 pub struct UsageEvent {
