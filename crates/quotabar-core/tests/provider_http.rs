@@ -106,3 +106,44 @@ async fn claude_malformed_body_is_schema_changed() {
     let p = ClaudeProvider { base_url: server.uri(), home: home.path().to_path_buf() };
     assert!(matches!(p.fetch_quota(&client()).await, Err(ProviderError::SchemaChanged(_))));
 }
+
+use quotabar_core::providers::codex::CodexProvider;
+
+fn fake_home_with_codex_creds() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path().join(".codex");
+    fs::create_dir_all(&d).unwrap();
+    fs::write(
+        d.join("auth.json"),
+        r#"{"auth_mode":"chatgpt","tokens":{"access_token":"tok","account_id":"acct-1"}}"#,
+    )
+    .unwrap();
+    dir
+}
+
+#[tokio::test]
+async fn codex_fetch_happy_path_sends_account_header() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/backend-api/wham/usage"))
+        .and(header("chatgpt-account-id", "acct-1"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(include_str!("fixtures/codex_usage.json")))
+        .mount(&server)
+        .await;
+    let home = fake_home_with_codex_creds();
+    let p = CodexProvider { base_url: server.uri(), home: home.path().to_path_buf() };
+    let snap = p.fetch_quota(&client()).await.unwrap();
+    assert_eq!(snap.plan.as_deref(), Some("Free"));
+}
+
+#[tokio::test]
+async fn codex_401_maps_to_token_expired() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(401))
+        .mount(&server)
+        .await;
+    let home = fake_home_with_codex_creds();
+    let p = CodexProvider { base_url: server.uri(), home: home.path().to_path_buf() };
+    assert!(matches!(p.fetch_quota(&client()).await, Err(ProviderError::TokenExpired)));
+}
