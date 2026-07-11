@@ -48,6 +48,7 @@ pub fn update_tray(app: &tauri::AppHandle, views: &[ProviderView]) {
 }
 
 pub fn toggle_panel(app: &tauri::AppHandle) {
+    use tauri::Emitter;
     use tauri_plugin_positioner::{Position, WindowExt};
     if let Some(w) = app.get_webview_window("panel") {
         if w.is_visible().unwrap_or(false) {
@@ -56,6 +57,7 @@ pub fn toggle_panel(app: &tauri::AppHandle) {
             let _ = w.move_window(Position::TrayBottomCenter);
             let _ = w.show();
             let _ = w.set_focus();
+            let _ = app.emit("panel-shown", ());
         }
     }
 }

@@ -102,8 +102,8 @@ immediate extra poll using the interval already in memory.
 
 | Field | Type | Default | Meaning |
 |---|---|---|---|
-| `poll_interval_secs` | number | `1800` | Seconds between quota-endpoint polls. Panel open and `Refresh now` always poll immediately regardless of this value. |
-| `enabled.claude` / `enabled.codex` / `enabled.grok` | bool | `true` | Set to `false` to hide a provider's bar entirely (no polling, no card). |
+| `poll_interval_secs` | number | `1800` | Seconds between quota-endpoint polls; values below 60 are clamped to 60. Opening the panel triggers an immediate usage refresh plus a quota poll; tray `Refresh now` triggers an immediate quota poll. |
+| `enabled.claude` / `enabled.codex` / `enabled.grok` | bool | `true` | Set to `false` to disable polling for that provider. The tray bar still renders, shown as gray/unavailable, and the panel still shows an empty card for it — fully hiding the bar/card is deferred to v0.2. |
 | `price_overrides` | array | `[]` | Per-model USD price overrides (per million tokens: `input`, `output`, `cache_read`, `cache_write`). `model_contains` is a substring match checked before the built-in price table, first match wins. |
 
 ## How it works

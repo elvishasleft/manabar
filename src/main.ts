@@ -112,5 +112,8 @@ function render(views: View[]) {
 }
 
 listen<View[]>("state", (e) => render(e.payload));
+listen("panel-shown", () => {
+  invoke<View[]>("panel_opened").then(render).catch((e) => console.error("panel_opened failed", e));
+});
 invoke<View[]>("panel_opened").then(render).catch((e) => console.error("panel_opened failed", e));
 setInterval(() => current.length && render(current), 30_000);

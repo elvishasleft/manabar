@@ -1,8 +1,8 @@
 [package]
 name = "quotabar"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "Tray monitor for Claude Code, Codex, and Grok usage quotas"
+authors = ["arteeeezy"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

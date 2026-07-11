@@ -54,12 +54,22 @@ impl AppShared {
     }
 
     pub async fn refresh_usage(&self) {
-        let mut cache = self.log_cache.lock().await;
         let today = Utc::now().date_naive();
+        let mut computed = Vec::with_capacity(self.providers.len());
+        {
+            let mut cache = self.log_cache.lock().await;
+            for p in self.providers.iter() {
+                if self.enabled(p.kind()) {
+                    computed.push(Some(p.fetch_usage(&mut cache, &self.prices, today)));
+                } else {
+                    computed.push(None);
+                }
+            }
+        }
         let mut views = self.views.write().await;
-        for (i, p) in self.providers.iter().enumerate() {
-            if self.enabled(p.kind()) {
-                views[i].usage = Some(p.fetch_usage(&mut cache, &self.prices, today));
+        for (i, stats) in computed.into_iter().enumerate() {
+            if let Some(s) = stats {
+                views[i].usage = Some(s);
             }
         }
     }
@@ -147,8 +157,10 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app, event| {
-            if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                api.prevent_exit();
+            if let tauri::RunEvent::ExitRequested { api, code, .. } = event {
+                if code.is_none() {
+                    api.prevent_exit();
+                }
             }
         });
 }
