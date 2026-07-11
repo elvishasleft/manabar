@@ -100,13 +100,24 @@ The trait exposes `fetch_quota()` and `fetch_usage_stats()`; both return
 
 All endpoints are unofficial (reverse-engineered) and were cross-verified on
 2026-07-11 against steipete/CodexBar `docs/`, CodeZeno, and openusage
-implementations. All three credential files exist on the target machine.
+implementations. Codex and Grok schemas were additionally captured live from
+this machine on 2026-07-11; the Claude endpoint returned 401 during capture
+(access token in the credentials file had expired — exactly the designed
+`TokenExpired` path), so the Claude response shape follows the community
+documentation and must be re-verified by the live smoke tests during
+implementation. Window labels must be derived from the response
+(`limit_window_seconds` / period type), not hard-coded: e.g. a free-plan
+Codex account exposes a single 30-day window, not 5h + weekly. Credential
+files also carry useful metadata: Claude `expiresAt` (epoch ms — if already
+past, mark `TokenExpired` without any HTTP call) and `subscriptionType`
+(plan label, no API needed); Codex `tokens.account_id` (sent as
+`chatgpt-account-id` header).
 
 | Provider | Credentials (read-only) | Quota endpoint | Cumulative source |
 |---|---|---|---|
 | Claude Code | `%USERPROFILE%\.claude\.credentials.json` | `GET https://api.anthropic.com/api/oauth/usage` with `Authorization: Bearer <access_token>` + `anthropic-beta: oauth-2025-04-20`. Fields: `five_hour`, `seven_day`, `seven_day_sonnet`, `seven_day_opus`, `extra_usage`; plan from `subscriptionType` / `rate_limit_tier`. | `%USERPROFILE%\.claude\projects\**\*.jsonl` |
 | Codex CLI | `%USERPROFILE%\.codex\auth.json` (or `$CODEX_HOME`) | `GET https://chatgpt.com/backend-api/wham/usage` with Bearer token. `rate_limit.primary_window` → 5h window, `secondary_window` → weekly; `additional_rate_limits[]` → per-model limits. | `%USERPROFILE%\.codex\sessions\**\*.jsonl` |
-| Grok CLI | `%USERPROFILE%\.grok\auth.json` | `GET https://cli-chat-proxy.grok.com/v1/billing?format=credits` (weekly pool + pay-as-you-go cap) + `GET .../v1/settings` (plan name). | `%USERPROFILE%\.grok\logs\unified.jsonl` |
+| Grok CLI | `%USERPROFILE%\.grok\auth.json` (map keyed by `issuer::client_id`; token field `key`) | `GET https://cli-chat-proxy.grok.com/v1/billing?format=credits` (`config.creditUsagePercent`, `currentPeriod.end`, on-demand cap/used) + `GET .../v1/settings` (`subscription_tier_display`). | `%USERPROFILE%\.grok\sessions\**\signals.json` (`contextTokensUsed`, `primaryModelId`; `unified.jsonl` carries no per-request tokens). Grok is credits-based: tokens shown, cost shown as "—". |
 
 ### Token policy: read-only, never refresh
 
