@@ -57,8 +57,10 @@ This produces two bundles under the workspace target directory:
 - NSIS installer: `target/release/bundle/nsis/QuotaBar_<version>_x64-setup.exe`
 - MSI installer: `target/release/bundle/msi/QuotaBar_<version>_x64_en-US.msi`
 
-Run either one (per-user install, no admin required) and QuotaBar starts
-in the tray. To uninstall, use Windows' "Add or remove programs", or run
+Run either one and QuotaBar starts in the tray. The NSIS installer is
+per-user (no admin required, installs under `%LOCALAPPDATA%`); the MSI is
+per-machine (elevation prompt, installs to `C:\Program Files\QuotaBar`).
+To uninstall, use Windows' "Add or remove programs", or run
 the uninstaller next to the installed exe (NSIS default:
 `%LOCALAPPDATA%\QuotaBar\uninstall.exe`).
 
