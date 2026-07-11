@@ -87,8 +87,9 @@ The trait exposes `fetch_quota()` and `fetch_usage_stats()`; both return
 
 ### Polling
 
-- Quota endpoints: every 2 minutes (configurable), plus immediately when the
-  panel opens and on `Refresh now`.
+- Quota endpoints: every 30 minutes (configurable), plus immediately when the
+  panel opens and on `Refresh now` — so tray colors may lag by up to the
+  poll interval, but the panel is always fresh on open.
 - Usage-log aggregation: on panel open, with an mtime-based incremental cache
   (only re-parse JSONL files whose mtime changed; keep per-file running
   totals so unchanged files are never re-read).
