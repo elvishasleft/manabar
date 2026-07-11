@@ -55,7 +55,11 @@ fn codex_auth_path(home: &Path, codex_home_env: Option<&str>) -> std::path::Path
 
 pub fn codex_token(home: &Path) -> Result<Token, ProviderError> {
     let path = codex_auth_path(home, std::env::var("CODEX_HOME").ok().as_deref());
-    let v = read_json(&path)?;
+    codex_token_at(&path)
+}
+
+fn codex_token_at(path: &Path) -> Result<Token, ProviderError> {
+    let v = read_json(path)?;
     let tokens = v
         .get("tokens")
         .ok_or_else(|| ProviderError::SchemaChanged("missing tokens".into()))?;
@@ -167,7 +171,7 @@ mod tests {
             ".codex/auth.json",
             r#"{"auth_mode":"chatgpt","tokens":{"access_token":"tok-x","account_id":"acct-1"}}"#,
         );
-        let t = codex_token(dir.path()).unwrap();
+        let t = codex_token_at(&dir.path().join(".codex").join("auth.json")).unwrap();
         assert_eq!(t.bearer, "tok-x");
         assert_eq!(t.account_id.as_deref(), Some("acct-1"));
         assert!(t.expires_at.is_none());
