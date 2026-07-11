@@ -67,6 +67,13 @@ Note for GNU-toolchain builds: if you compile with
 from the MSI — the NSIS bundle currently omits `WebView2Loader.dll`,
 which GNU builds load dynamically, and the installed app will fail to
 start without it. MSVC builds link it statically and are unaffected.
+The same applies to running `target/release/quotabar.exe` directly on a
+GNU toolchain ("The code execution cannot proceed because
+WebView2Loader.dll was not found"): copy the DLL next to the exe once —
+
+```bash
+cp target/release/build/webview2-com-sys-*/out/x64/WebView2Loader.dll target/release/
+```
 
 Once this repo is public, a prebuilt installer will be attached to
 GitHub Releases instead.
