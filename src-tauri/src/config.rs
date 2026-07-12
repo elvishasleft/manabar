@@ -110,10 +110,19 @@ pub fn config_path() -> PathBuf {
 }
 
 pub fn load(path: &Path) -> Config {
-    std::fs::read_to_string(path)
-        .ok()
-        .and_then(|t| serde_json::from_str(&t).ok())
-        .unwrap_or_default()
+    match std::fs::read_to_string(path) {
+        Err(_) => Config::default(), // missing file: normal first run, stay quiet
+        Ok(text) => {
+            let text = text.trim_start_matches('\u{feff}'); // strip UTF-8 BOM
+            match serde_json::from_str(text) {
+                Ok(cfg) => cfg,
+                Err(e) => {
+                    log::warn!("config.json is invalid, falling back to defaults: {e}");
+                    Config::default()
+                }
+            }
+        }
+    }
 }
 
 pub fn save(path: &Path, cfg: &Config) -> std::io::Result<()> {
@@ -182,6 +191,22 @@ mod tests {
         assert_eq!(load(&path), cfg);
         std::fs::write(&path, "garbage{{{").unwrap();
         assert_eq!(load(&path), Config::default());
+    }
+
+    #[test]
+    fn load_tolerates_utf8_bom() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        // Write a config with UTF-8 BOM (EF BB BF) followed by valid JSON
+        let json = r#"{"poll_interval_secs":0,"deepseek_budget":100.0}"#;
+        let bom = b"\xef\xbb\xbf";
+        let mut content = bom.to_vec();
+        content.extend_from_slice(json.as_bytes());
+        std::fs::write(&path, content).unwrap();
+
+        let cfg = load(&path);
+        assert_eq!(cfg.poll_interval_secs, 0, "poll_interval_secs should be 0");
+        assert_eq!(cfg.deepseek_budget, Some(100.0), "deepseek_budget should be 100.0");
     }
 
     #[test]

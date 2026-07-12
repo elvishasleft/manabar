@@ -33,10 +33,19 @@ pub fn state_path() -> PathBuf {
 /// is missing or its contents don't parse — a corrupt state file must never
 /// crash the app, it just means burn-rate ETAs start cold again.
 pub fn load(path: &Path) -> SampleStore {
-    std::fs::read_to_string(path)
-        .ok()
-        .and_then(|t| serde_json::from_str(&t).ok())
-        .unwrap_or_default()
+    match std::fs::read_to_string(path) {
+        Err(_) => SampleStore::default(), // missing file: normal, stay quiet
+        Ok(text) => {
+            let text = text.trim_start_matches('\u{feff}'); // strip UTF-8 BOM
+            match serde_json::from_str(text) {
+                Ok(store) => store,
+                Err(e) => {
+                    log::warn!("state.json is invalid, falling back to defaults: {e}");
+                    SampleStore::default()
+                }
+            }
+        }
+    }
 }
 
 pub fn save(path: &Path, store: &SampleStore) -> std::io::Result<()> {
