@@ -287,6 +287,38 @@ body::-webkit-scrollbar-thumb:hover {
   line-height: 1.5;
 }
 
+.refresh-btn {
+  align-self: flex-start;
+  margin-top: 2px;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--health-red) 78%, var(--text-primary) 22%);
+  background: color-mix(in srgb, var(--health-red) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--health-red) 38%, var(--border-strong) 62%);
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--health-red) 16%, transparent);
+  border-color: color-mix(in srgb, var(--health-red) 60%, var(--border-strong) 40%);
+}
+
+.refresh-btn:focus-visible {
+  outline: 2px solid var(--health-red);
+  outline-offset: 2px;
+}
+
+.refresh-btn:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
 /* ---------------------------------- bottom --------------------------------- */
 
 .card-bottom {

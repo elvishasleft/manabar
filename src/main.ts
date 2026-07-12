@@ -106,9 +106,39 @@ function windowLine(w: RateWindow): string {
   return `<div class="win-line">${parts.join(" · ")}</div>`;
 }
 
+// Sign-in refresh state lives OUTSIDE the DOM: card markup is rebuilt via
+// innerHTML on every render (state events, panel-shown, the 30s footer
+// tick), so a disabled attribute set only on the live button node would be
+// silently wiped mid-flight — re-enabling the button while the CLI is still
+// running and allowing duplicate spawns. refreshButtonHtml consults these
+// sets so every re-render faithfully reproduces pending/failed state until
+// the invoke settles or the provider recovers.
+const pendingRefresh = new Set<string>();
+const failedRefresh = new Set<string>();
+
+// Only Claude and Grok have a local CLI that can refresh an expired token by
+// re-running with a trivial prompt (see refresh_signin in commands.rs).
+// Codex has no local refresh CLI, so its expired-token error stays text-only.
+function canRefreshSignin(v: View): boolean {
+  return v.error_kind === "token_expired" && (v.kind === "claude" || v.kind === "grok");
+}
+
+// v.kind is a closed enum ("claude" | "codex" | "grok"), so it's safe to
+// inline into the data attribute without escaping.
+function refreshButtonHtml(v: View): string {
+  if (!canRefreshSignin(v)) return "";
+  if (pendingRefresh.has(v.kind)) {
+    return `<button type="button" class="refresh-btn" data-kind="${v.kind}" disabled>Refreshing…</button>`;
+  }
+  const label = failedRefresh.has(v.kind)
+    ? "Refresh failed — run the CLI manually"
+    : "Refresh sign-in";
+  return `<button type="button" class="refresh-btn" data-kind="${v.kind}">${label}</button>`;
+}
+
 function card(v: View): string {
   const windowsHtml = v.error_kind
-    ? `<div class="win-line win-error"><span class="err-icon" aria-hidden="true">⚠</span>${esc(errorCopy(v))}</div>`
+    ? `<div class="win-line win-error"><span class="err-icon" aria-hidden="true">⚠</span>${esc(errorCopy(v))}</div>${refreshButtonHtml(v)}`
     : (v.quota?.windows ?? []).map(windowLine).join("");
   const today = v.usage?.days.at(-1);
   const cost = today?.est_cost_usd != null ? `$${today.est_cost_usd.toFixed(2)} est.` : "—";
@@ -139,10 +169,45 @@ function card(v: View): string {
 
 function render(views: View[]) {
   current = views;
+  // A provider that no longer shows an expired token has no refresh button —
+  // drop its stale failure flag so a future re-expiry starts clean. Pending
+  // entries are left alone: they are cleared when their invoke settles.
+  for (const v of views) {
+    if (!canRefreshSignin(v)) failedRefresh.delete(v.kind);
+  }
   const updated = views.find((v) => v.updated_at)?.updated_at ?? null;
   document.querySelector<HTMLElement>("#app")!.innerHTML =
     views.map(card).join("") + `<footer>updated ${age(updated) || "—"}</footer>`;
 }
+
+// Card markup is fully rebuilt via innerHTML on every render, so individual
+// .refresh-btn elements come and go — one delegated listener on the
+// never-replaced #app container handles clicks for whichever button is
+// current. The pendingRefresh/failedRefresh sets (see refreshButtonHtml)
+// carry the button state across re-renders; the direct DOM mutations here
+// just give instant feedback before the next render.
+document.querySelector<HTMLElement>("#app")!.addEventListener("click", (e) => {
+  const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(".refresh-btn");
+  if (!btn || btn.disabled) return;
+  const kind = btn.dataset.kind;
+  if (!kind || pendingRefresh.has(kind)) return;
+  pendingRefresh.add(kind);
+  failedRefresh.delete(kind);
+  btn.disabled = true;
+  btn.textContent = "Refreshing…";
+  invoke("refresh_signin", { kind })
+    .then(() => {
+      // Success: the backend re-poll emits a "state" event that re-renders
+      // the card without the error (and thus without the button).
+      pendingRefresh.delete(kind);
+    })
+    .catch((err) => {
+      console.error("refresh_signin failed", err);
+      pendingRefresh.delete(kind);
+      failedRefresh.add(kind);
+      if (current.length) render(current);
+    });
+});
 
 listen<View[]>("state", (e) => render(e.payload));
 listen("panel-shown", () => {
