@@ -206,7 +206,11 @@ mod tests {
 
         let cfg = load(&path);
         assert_eq!(cfg.poll_interval_secs, 0, "poll_interval_secs should be 0");
-        assert_eq!(cfg.deepseek_budget, Some(100.0), "deepseek_budget should be 100.0");
+        assert_eq!(
+            cfg.deepseek_budget,
+            Some(100.0),
+            "deepseek_budget should be 100.0"
+        );
     }
 
     #[test]
