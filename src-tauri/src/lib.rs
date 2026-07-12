@@ -106,9 +106,26 @@ impl AppShared {
                 let fetched_at = quota.fetched_at;
                 let kind_key = provider_kind_key(p.kind());
                 let mut store = self.sample_store.lock().await;
+
+                // Build occurrence-qualified store keys to avoid collisions when multiple
+                // windows have the same label (e.g., "Weekly (scoped)" emitted twice when
+                // scope.model.display_name is missing).
+                let mut seen: std::collections::HashMap<&str, u32> =
+                    std::collections::HashMap::new();
                 for window in quota.windows.iter_mut() {
-                    window.exhaust_eta = compute_window_eta(&store, kind_key, window, fetched_at);
-                    record_sample(&mut store, kind_key, window, fetched_at);
+                    let count = seen
+                        .entry(window.label.as_str())
+                        .and_modify(|c| *c += 1)
+                        .or_insert(1);
+                    let store_key = if *count == 1 {
+                        window.label.clone()
+                    } else {
+                        format!("{}#{}", window.label, count)
+                    };
+
+                    window.exhaust_eta =
+                        compute_window_eta(&store, kind_key, &store_key, window, fetched_at);
+                    record_sample(&mut store, kind_key, &store_key, window, fetched_at);
                 }
             }
         }
@@ -130,18 +147,45 @@ fn provider_kind_key(kind: ProviderKind) -> &'static str {
     }
 }
 
-/// Looks up the previous sample for `kind_key`/`window.label` and, if one
+/// Deduplicates window labels into occurrence-qualified store keys.
+/// For example, ["A", "A", "B"] becomes ["A", "A#2", "B"].
+/// This prevents collisions in the sample store when multiple windows
+/// share the same label. This function is tested via unit tests in the tests module.
+#[allow(dead_code)]
+fn dedup_store_keys(labels: &[&str]) -> Vec<String> {
+    let mut seen: std::collections::HashMap<&str, u32> = std::collections::HashMap::new();
+    labels
+        .iter()
+        .map(|label| {
+            let count = seen
+                .entry(label)
+                .and_modify(|c| *c += 1)
+                .or_insert(1);
+            if *count == 1 {
+                label.to_string()
+            } else {
+                format!("{}#{}", label, count)
+            }
+        })
+        .collect()
+}
+
+/// Looks up the previous sample for `kind_key`/`store_key` and, if one
 /// exists, projects an exhaustion ETA via `quota_math::exhaust_eta`. The
 /// projection is suppressed (returns `None`) when the window's own
 /// `resets_at` would arrive before the projected exhaustion — a window that
 /// resets before it runs out isn't actually at risk.
+///
+/// Store keys are occurrence-qualified (e.g., "5h", "5h#2") to disambiguate
+/// windows with identical labels.
 fn compute_window_eta(
     store: &state::SampleStore,
     kind_key: &str,
+    store_key: &str,
     window: &RateWindow,
     curr_t: DateTime<Utc>,
 ) -> Option<DateTime<Utc>> {
-    let prev = store.samples.get(kind_key)?.get(&window.label)?;
+    let prev = store.samples.get(kind_key)?.get(store_key)?;
     let prev_t = DateTime::from_timestamp_millis(prev.t_ms)?;
     let eta = exhaust_eta(prev_t, prev.used, curr_t, window.used_percent)?;
     window
@@ -149,13 +193,17 @@ fn compute_window_eta(
         .map_or(Some(eta), |resets_at| (eta < resets_at).then_some(eta))
 }
 
-/// Writes the current reading for `kind_key`/`window.label` into the store,
+/// Writes the current reading for `kind_key`/`store_key` into the store,
 /// overwriting whatever `compute_window_eta` just read as "previous" — the
 /// next poll's projection is always fit against these two most-recent
 /// points.
+///
+/// Store keys are occurrence-qualified (e.g., "5h", "5h#2") to disambiguate
+/// windows with identical labels.
 fn record_sample(
     store: &mut state::SampleStore,
     kind_key: &str,
+    store_key: &str,
     window: &RateWindow,
     curr_t: DateTime<Utc>,
 ) {
@@ -164,7 +212,7 @@ fn record_sample(
         .entry(kind_key.to_string())
         .or_default()
         .insert(
-            window.label.clone(),
+            store_key.to_string(),
             state::Sample {
                 t_ms: curr_t.timestamp_millis(),
                 used: window.used_percent,
@@ -389,7 +437,7 @@ mod tests {
     fn compute_window_eta_none_without_prior_sample() {
         let store = state::SampleStore::default();
         let w = window("5h", 50.0, None);
-        assert!(compute_window_eta(&store, "claude", &w, Utc::now()).is_none());
+        assert!(compute_window_eta(&store, "claude", "5h", &w, Utc::now()).is_none());
     }
 
     #[test]
@@ -405,7 +453,7 @@ mod tests {
         );
         let t1 = t0 + chrono::Duration::minutes(30);
         let w = window("5h", 50.0, None);
-        let eta = compute_window_eta(&store, "claude", &w, t1).unwrap();
+        let eta = compute_window_eta(&store, "claude", "5h", &w, t1).unwrap();
         assert_eq!(eta, t1 + chrono::Duration::minutes(150));
     }
 
@@ -424,7 +472,7 @@ mod tests {
         // Projected eta is t1 + 150min; a reset 60min away arrives first.
         let resets_at = t1 + chrono::Duration::minutes(60);
         let w = window("5h", 50.0, Some(resets_at));
-        assert!(compute_window_eta(&store, "claude", &w, t1).is_none());
+        assert!(compute_window_eta(&store, "claude", "5h", &w, t1).is_none());
     }
 
     #[test]
@@ -441,15 +489,15 @@ mod tests {
         let t1 = t0 + chrono::Duration::minutes(30);
         let resets_at = t1 + chrono::Duration::minutes(200);
         let w = window("5h", 50.0, Some(resets_at));
-        assert!(compute_window_eta(&store, "claude", &w, t1).is_some());
+        assert!(compute_window_eta(&store, "claude", "5h", &w, t1).is_some());
     }
 
     #[test]
-    fn record_sample_writes_current_reading_under_kind_and_label() {
+    fn record_sample_writes_current_reading_under_kind_and_store_key() {
         let mut store = state::SampleStore::default();
         let now = Utc::now();
         let w = window("30d", 33.0, None);
-        record_sample(&mut store, "codex", &w, now);
+        record_sample(&mut store, "codex", "30d", &w, now);
         let saved = store.samples.get("codex").unwrap().get("30d").unwrap();
         assert_eq!(saved.used, 33.0);
         assert_eq!(saved.t_ms, now.timestamp_millis());
@@ -534,5 +582,43 @@ mod tests {
     fn notification_body_none_without_quota() {
         let view = initial_view(ProviderKind::Grok);
         assert!(notification_body(&view).is_none());
+    }
+
+    #[test]
+    fn dedup_store_keys_single_unique_labels() {
+        let labels = vec!["A", "B", "C"];
+        let result = dedup_store_keys(&labels);
+        assert_eq!(result, vec!["A", "B", "C"]);
+    }
+
+    #[test]
+    fn dedup_store_keys_duplicate_labels() {
+        let labels = vec!["A", "A", "B"];
+        let result = dedup_store_keys(&labels);
+        assert_eq!(result, vec!["A", "A#2", "B"]);
+    }
+
+    #[test]
+    fn dedup_store_keys_multiple_duplicates() {
+        let labels = vec!["X", "Y", "X", "Y", "X"];
+        let result = dedup_store_keys(&labels);
+        assert_eq!(result, vec!["X", "Y", "X#2", "Y#2", "X#3"]);
+    }
+
+    #[test]
+    fn collision_handling_distinct_samples_per_occurrence() {
+        let mut store = state::SampleStore::default();
+        let t0 = Utc.with_ymd_and_hms(2026, 7, 12, 10, 0, 0).unwrap();
+
+        // Simulate two windows with identical labels, stored under different keys.
+        let w1 = window("Weekly", 30.0, None);
+        let w2 = window("Weekly", 50.0, None);
+
+        record_sample(&mut store, "claude", "Weekly", &w1, t0);
+        record_sample(&mut store, "claude", "Weekly#2", &w2, t0);
+
+        let samples = store.samples.get("claude").unwrap();
+        assert_eq!(samples.get("Weekly").unwrap().used, 30.0);
+        assert_eq!(samples.get("Weekly#2").unwrap().used, 50.0);
     }
 }
