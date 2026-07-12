@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "panel window capabilities",
   "windows": ["panel"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "notification:default"]
 }

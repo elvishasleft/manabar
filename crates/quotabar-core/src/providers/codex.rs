@@ -33,6 +33,7 @@ fn window(raw: WindowRaw) -> RateWindow {
             .unwrap_or_else(|| "Window".into()),
         used_percent: raw.used_percent,
         resets_at: raw.reset_at.and_then(|s| Utc.timestamp_opt(s, 0).single()),
+        exhaust_eta: None,
     }
 }
 

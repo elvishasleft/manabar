@@ -15,6 +15,11 @@ pub struct RateWindow {
     pub label: String,
     pub used_percent: f64,
     pub resets_at: Option<DateTime<Utc>>,
+    /// Projected exhaustion time from a linear burn-rate fit over the last
+    /// two polls (see `quota_math::exhaust_eta`). Providers always set this
+    /// to `None` at parse time — the shell computes it post-poll from
+    /// persisted samples.
+    pub exhaust_eta: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]

@@ -69,6 +69,7 @@ pub fn parse_balance(
             label: "Balance".into(),
             used_percent,
             resets_at: None,
+            exhaust_eta: None,
         }],
         fetched_at,
     })

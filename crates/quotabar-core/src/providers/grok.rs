@@ -51,6 +51,7 @@ pub fn parse_billing(
         label: "Weekly credits".into(),
         used_percent: used,
         resets_at,
+        exhaust_eta: None,
     }];
     let cap = config.on_demand_cap.and_then(|v| v.val).unwrap_or(0.0);
     if cap > 0.0 {
@@ -59,6 +60,7 @@ pub fn parse_billing(
             label: "On-demand".into(),
             used_percent: (od_used / cap) * 100.0,
             resets_at: None,
+            exhaust_eta: None,
         });
     }
     Ok(QuotaSnapshot {
