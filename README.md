@@ -97,8 +97,6 @@ WebView2Loader.dll was not found"): copy the DLL next to the exe once —
 cp target/release/build/webview2-com-sys-*/out/x64/WebView2Loader.dll target/release/
 ```
 
-Once this repo is public, a prebuilt installer will be attached to
-GitHub Releases instead.
 
 ## macOS
 
