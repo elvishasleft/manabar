@@ -20,10 +20,24 @@ pub struct AppShared {
     http: reqwest::Client,
     cfg: config::Config,
     prices: PriceTable,
+    thresholds: quotabar_core::Thresholds,
     log_cache: tokio::sync::Mutex<LogCache>,
     refresh: tokio::sync::Notify,
     sample_store: tokio::sync::Mutex<state::SampleStore>,
     last_health: tokio::sync::Mutex<HashMap<ProviderKind, Health>>,
+}
+
+/// Whether `kind` is enabled per `cfg` — the single source of truth for the
+/// `Enabled` struct's per-field mapping, shared by `AppShared::enabled` and
+/// the initial per-view `enabled` flag set in `AppShared::new` so the two
+/// never drift apart.
+fn provider_enabled(cfg: &config::Config, kind: ProviderKind) -> bool {
+    match kind {
+        ProviderKind::Claude => cfg.enabled.claude,
+        ProviderKind::Codex => cfg.enabled.codex,
+        ProviderKind::Grok => cfg.enabled.grok,
+        ProviderKind::DeepSeek => cfg.enabled.deepseek,
+    }
 }
 
 impl AppShared {
@@ -33,12 +47,21 @@ impl AppShared {
         sample_store: state::SampleStore,
     ) -> Self {
         let providers = default_providers(home, cfg.deepseek_api_key.clone(), cfg.deepseek_budget);
-        let views = providers.iter().map(|p| initial_view(p.kind())).collect();
+        let thresholds = config::sanitized_thresholds(&cfg);
+        let views = providers
+            .iter()
+            .map(|p| {
+                let mut v = initial_view(p.kind());
+                v.enabled = provider_enabled(&cfg, p.kind());
+                v
+            })
+            .collect();
         Self {
             views: tokio::sync::RwLock::new(views),
             providers,
             http: http::client(),
             prices: config::price_table(&cfg),
+            thresholds,
             cfg,
             log_cache: tokio::sync::Mutex::new(LogCache::default()),
             refresh: tokio::sync::Notify::new(),
@@ -48,12 +71,18 @@ impl AppShared {
     }
 
     fn enabled(&self, kind: ProviderKind) -> bool {
-        match kind {
-            ProviderKind::Claude => self.cfg.enabled.claude,
-            ProviderKind::Codex => self.cfg.enabled.codex,
-            ProviderKind::Grok => self.cfg.enabled.grok,
-            ProviderKind::DeepSeek => self.cfg.enabled.deepseek,
-        }
+        provider_enabled(&self.cfg, kind)
+    }
+
+    /// Count of currently-enabled providers, used to size the placeholder
+    /// tray icon shown before the first poll completes (see
+    /// `tray::create_tray`). Synchronous and lock-free — it only reads
+    /// config-derived state, not the polled `views`.
+    pub(crate) fn enabled_count(&self) -> usize {
+        self.providers
+            .iter()
+            .filter(|p| self.enabled(p.kind()))
+            .count()
     }
 
     pub async fn views(&self) -> Vec<ProviderView> {
@@ -101,7 +130,7 @@ impl AppShared {
                 log::warn!("{:?} quota fetch failed: {e}", p.kind());
             }
             let mut views = self.views.write().await;
-            views[i] = update_view(&views[i], result);
+            views[i] = update_view(&views[i], result, &self.thresholds);
             if let Some(quota) = views[i].quota.as_mut() {
                 let fetched_at = quota.fetched_at;
                 let kind_key = provider_kind_key(p.kind());

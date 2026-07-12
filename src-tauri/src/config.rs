@@ -31,6 +31,26 @@ pub struct PriceOverride {
     pub cache_write: f64,
 }
 
+/// User-facing config shape for health-color thresholds. Deliberately
+/// separate from `quotabar_core::Thresholds`: this one is raw, possibly
+/// invalid, user-editable JSON; `sanitized_thresholds` is the only path
+/// from here to the validated core type.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct ThresholdsConfig {
+    pub amber: f64,
+    pub red: f64,
+}
+
+impl Default for ThresholdsConfig {
+    fn default() -> Self {
+        Self {
+            amber: 30.0,
+            red: 10.0,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct Config {
@@ -39,6 +59,7 @@ pub struct Config {
     pub price_overrides: Vec<PriceOverride>,
     pub deepseek_api_key: Option<String>,
     pub deepseek_budget: Option<f64>,
+    pub thresholds: ThresholdsConfig,
 }
 
 impl Default for Config {
@@ -49,7 +70,30 @@ impl Default for Config {
             price_overrides: vec![],
             deepseek_api_key: None,
             deepseek_budget: None,
+            thresholds: ThresholdsConfig::default(),
         }
+    }
+}
+
+/// Validates `cfg.thresholds` and converts to the core `Thresholds` type
+/// consumed by `health_for`. Valid iff `0.0 <= red < amber <= 100.0` — any
+/// other combination (inverted/equal boundaries, negative, or over 100)
+/// falls back to the built-in defaults rather than producing a `Health`
+/// classification that could never show green (or never show red).
+pub fn sanitized_thresholds(cfg: &Config) -> quotabar_core::Thresholds {
+    let t = cfg.thresholds;
+    if (0.0..t.amber).contains(&t.red) && t.amber <= 100.0 {
+        quotabar_core::Thresholds {
+            amber: t.amber,
+            red: t.red,
+        }
+    } else {
+        log::warn!(
+            "invalid thresholds in config (amber={}, red={}); must satisfy 0.0 <= red < amber <= 100.0 — using defaults",
+            t.amber,
+            t.red
+        );
+        quotabar_core::Thresholds::default()
     }
 }
 
@@ -111,6 +155,7 @@ mod tests {
         assert!(cfg.price_overrides.is_empty());
         assert!(cfg.deepseek_api_key.is_none());
         assert!(cfg.deepseek_budget.is_none());
+        assert_eq!(cfg.thresholds, ThresholdsConfig::default());
     }
 
     #[test]
@@ -147,6 +192,90 @@ mod tests {
         assert!(cfg.enabled.deepseek, "deepseek enabled defaults to true");
         assert!(cfg.deepseek_api_key.is_none());
         assert!(cfg.deepseek_budget.is_none());
+        assert_eq!(
+            cfg.thresholds,
+            ThresholdsConfig::default(),
+            "old config without a thresholds key must still load, defaulting to 30/10"
+        );
+    }
+
+    #[test]
+    fn old_config_without_thresholds_key_still_loads() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        std::fs::write(
+            &path,
+            r#"{"poll_interval_secs":1800,"enabled":{"claude":true,"codex":true,"grok":true,"deepseek":true},"price_overrides":[],"deepseek_api_key":null,"deepseek_budget":null}"#,
+        )
+        .unwrap();
+        let cfg = load(&path);
+        assert_eq!(cfg.thresholds, ThresholdsConfig::default());
+    }
+
+    #[test]
+    fn partial_thresholds_object_fills_in_missing_field() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        std::fs::write(&path, r#"{"thresholds":{"amber":50.0}}"#).unwrap();
+        let cfg = load(&path);
+        assert_eq!(cfg.thresholds.amber, 50.0);
+        assert_eq!(
+            cfg.thresholds.red, 10.0,
+            "missing red falls back to default"
+        );
+    }
+
+    #[test]
+    fn sanitized_thresholds_accepts_valid_custom_values() {
+        let cfg = Config {
+            thresholds: ThresholdsConfig {
+                amber: 50.0,
+                red: 20.0,
+            },
+            ..Config::default()
+        };
+        let t = sanitized_thresholds(&cfg);
+        assert_eq!(t.amber, 50.0);
+        assert_eq!(t.red, 20.0);
+    }
+
+    #[test]
+    fn sanitized_thresholds_falls_back_when_red_gte_amber() {
+        let cfg = Config {
+            thresholds: ThresholdsConfig {
+                amber: 20.0,
+                red: 20.0,
+            },
+            ..Config::default()
+        };
+        let t = sanitized_thresholds(&cfg);
+        assert_eq!(t, quotabar_core::Thresholds::default());
+    }
+
+    #[test]
+    fn sanitized_thresholds_falls_back_when_red_negative() {
+        let cfg = Config {
+            thresholds: ThresholdsConfig {
+                amber: 30.0,
+                red: -5.0,
+            },
+            ..Config::default()
+        };
+        let t = sanitized_thresholds(&cfg);
+        assert_eq!(t, quotabar_core::Thresholds::default());
+    }
+
+    #[test]
+    fn sanitized_thresholds_falls_back_when_amber_over_100() {
+        let cfg = Config {
+            thresholds: ThresholdsConfig {
+                amber: 150.0,
+                red: 10.0,
+            },
+            ..Config::default()
+        };
+        let t = sanitized_thresholds(&cfg);
+        assert_eq!(t, quotabar_core::Thresholds::default());
     }
 
     #[test]

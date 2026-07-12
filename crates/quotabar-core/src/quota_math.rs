@@ -14,10 +14,30 @@ const MAX_DELTA_SECS: i64 = 48 * 3_600;
 /// negative/undefined for a non-positive rate) that it isn't actionable.
 const MIN_RATE_PERCENT_PER_MIN: f64 = 0.01;
 
-pub fn health_for(remaining_percent: f64) -> Health {
-    if remaining_percent > 30.0 {
+/// Configurable health boundaries: green above `amber`, amber above `red`,
+/// red at or below `red`. Defaults match the original hard-coded 30%/10%
+/// split. The shell is responsible for validating these before
+/// constructing one (see `config::sanitized_thresholds`) — `health_for`
+/// itself trusts its input.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Thresholds {
+    pub amber: f64,
+    pub red: f64,
+}
+
+impl Default for Thresholds {
+    fn default() -> Self {
+        Self {
+            amber: 30.0,
+            red: 10.0,
+        }
+    }
+}
+
+pub fn health_for(remaining_percent: f64, thresholds: &Thresholds) -> Health {
+    if remaining_percent > thresholds.amber {
         Health::Green
-    } else if remaining_percent > 10.0 {
+    } else if remaining_percent > thresholds.red {
         Health::Amber
     } else {
         Health::Red
@@ -106,12 +126,26 @@ mod tests {
 
     #[test]
     fn health_boundaries() {
-        assert_eq!(health_for(100.0), Health::Green);
-        assert_eq!(health_for(30.1), Health::Green);
-        assert_eq!(health_for(30.0), Health::Amber);
-        assert_eq!(health_for(10.1), Health::Amber);
-        assert_eq!(health_for(10.0), Health::Red);
-        assert_eq!(health_for(0.0), Health::Red);
+        let t = Thresholds::default();
+        assert_eq!(health_for(100.0, &t), Health::Green);
+        assert_eq!(health_for(30.1, &t), Health::Green);
+        assert_eq!(health_for(30.0, &t), Health::Amber);
+        assert_eq!(health_for(10.1, &t), Health::Amber);
+        assert_eq!(health_for(10.0, &t), Health::Red);
+        assert_eq!(health_for(0.0, &t), Health::Red);
+    }
+
+    #[test]
+    fn health_for_respects_custom_thresholds() {
+        let t = Thresholds {
+            amber: 50.0,
+            red: 20.0,
+        };
+        assert_eq!(health_for(60.0, &t), Health::Green);
+        assert_eq!(health_for(50.0, &t), Health::Amber);
+        assert_eq!(health_for(25.0, &t), Health::Amber);
+        assert_eq!(health_for(20.0, &t), Health::Red);
+        assert_eq!(health_for(0.0, &t), Health::Red);
     }
 
     #[test]

@@ -13,22 +13,27 @@ readout, redrawn after every poll.
 
 ## Tray icon legend
 
-The icon is four vertical bars, always in this order: **Claude, Codex,
-Grok, DeepSeek**. Bar height is remaining quota; bar color is health,
-based on the *binding constraint* (the lowest remaining percentage
-across that provider's rate-limit windows — for DeepSeek, its single
-`Balance` window):
+The icon is one vertical bar per **enabled** provider, always in this
+relative order: **Claude, Codex, Grok, DeepSeek**. A provider disabled via
+`enabled.*` in config (see Configuration below) contributes no bar at
+all — the icon narrows and re-centers rather than showing a placeholder,
+so with e.g. only Claude and Grok enabled you get two centered bars, not
+four with two grayed out. Bar height is remaining quota; bar color is
+health, based on the *binding constraint* (the lowest remaining
+percentage across that provider's rate-limit windows — for DeepSeek, its
+single `Balance` window) against the configurable `thresholds`:
 
 | Color | Meaning |
 |---|---|
-| green | remaining > 30% |
-| amber | 10% < remaining ≤ 30% |
-| red | remaining ≤ 10% |
+| green | remaining > `thresholds.amber` (default 30%) |
+| amber | `thresholds.red` (default 10%) < remaining ≤ `thresholds.amber` |
+| red | remaining ≤ `thresholds.red` (default 10%) |
 | gray (dimmed, full-height) | unavailable — no credentials, expired sign-in, network error, or the endpoint's response no longer parses |
 
 Hovering the icon shows a tooltip, e.g.
-`Claude 82% · Codex 35% · Grok 95% · DeepSeek 60%` (unavailable
-providers show as `Codex —`). Left-click opens the panel; right-click
+`Claude 82% · Codex 35% · Grok 95% · DeepSeek 60%` — an *enabled* provider
+that's unavailable shows as `Codex —`, but a *disabled* provider doesn't
+appear in the tooltip at all. Left-click opens the panel; right-click
 gives `Refresh now`, `Start with Windows`, and `Quit`.
 
 ## Requirements
@@ -115,15 +120,20 @@ immediate extra poll using the interval already in memory.
     }
   ],
   "deepseek_api_key": null,
-  "deepseek_budget": null
+  "deepseek_budget": null,
+  "thresholds": {
+    "amber": 30.0,
+    "red": 10.0
+  }
 }
 ```
 
 | Field | Type | Default | Meaning |
 |---|---|---|---|
 | `poll_interval_secs` | number | `1800` | Seconds between quota-endpoint polls. `0` enables **on-demand mode**: no periodic background polling — QuotaBar polls once at startup (so the tray has a baseline), then refreshes only when the panel is opened or tray `Refresh now` is clicked; tray levels stay at their last-known value between opens. Values 1-59 are clamped to 60. Opening the panel triggers an immediate usage refresh plus a quota poll; tray `Refresh now` triggers an immediate quota poll. |
-| `enabled.claude` / `enabled.codex` / `enabled.grok` / `enabled.deepseek` | bool | `true` | Set to `false` to disable polling for that provider. The tray bar still renders, shown as gray/unavailable, and the panel still shows an empty card for it — fully hiding the bar/card is deferred to a future release. |
+| `enabled.claude` / `enabled.codex` / `enabled.grok` / `enabled.deepseek` | bool | `true` | Set to `false` to fully hide that provider: no tray bar (the icon narrows and re-centers around the remaining bars) and no panel card. Polling for it stops entirely — this isn't a display-only toggle. |
 | `price_overrides` | array | `[]` | Per-model USD price overrides (per million tokens: `input`, `output`, `cache_read`, `cache_write`). `model_contains` is a substring match checked before the built-in price table, first match wins. |
+| `thresholds.amber` / `thresholds.red` | number | `30.0` / `10.0` | Health-color boundaries, as a remaining-percent cutoff: green above `amber`, amber above `red`, red at or below `red`. Must satisfy `0.0 ≤ red < amber ≤ 100.0` — an invalid combination (inverted/equal, negative, or over 100) is logged as a warning and the built-in 30/10 defaults are used instead for that run. |
 | `deepseek_api_key` | string or `null` | `null` | Fallback DeepSeek API key, used only when the `DEEPSEEK_API_KEY` environment variable isn't set (or is blank). The environment variable always wins when present. |
 | `deepseek_budget` | number or `null` | `null` | Optional total balance budget (same currency as your DeepSeek account, e.g. CNY) for turning the `Balance` window into a real used-percent gauge: `used% = (1 - balance/budget) × 100`, clamped 0-100. Without a budget, DeepSeek's card is a binary green/red signal from the account's own `is_available` flag — 0% used while usable, 100% once DeepSeek reports it can't serve requests. |
 

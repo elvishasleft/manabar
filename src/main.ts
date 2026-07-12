@@ -23,6 +23,10 @@ type View = {
   error_kind: string | null;
   usage: { days: DayUsage[] } | null;
   updated_at: string | null;
+  // false means the provider is disabled in config — the shell's tray icon
+  // and this panel both omit it entirely rather than showing an empty/gray
+  // placeholder card.
+  enabled: boolean;
 };
 
 const NAMES: Record<View["kind"], string> = {
@@ -215,9 +219,12 @@ function render(views: View[]) {
   for (const v of views) {
     if (!canRefreshSignin(v)) failedRefresh.delete(v.kind);
   }
-  const updated = views.find((v) => v.updated_at)?.updated_at ?? null;
+  // Disabled providers disappear entirely — no card, no contribution to the
+  // "updated" footer timestamp — rather than showing an empty/gray card.
+  const visible = views.filter((v) => v.enabled);
+  const updated = visible.find((v) => v.updated_at)?.updated_at ?? null;
   document.querySelector<HTMLElement>("#app")!.innerHTML =
-    views.map(card).join("") + `<footer>updated ${age(updated) || "—"}</footer>`;
+    visible.map(card).join("") + `<footer>updated ${age(updated) || "—"}</footer>`;
 }
 
 // Card markup is fully rebuilt via innerHTML on every render, so individual
