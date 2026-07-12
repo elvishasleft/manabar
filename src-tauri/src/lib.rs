@@ -157,10 +157,7 @@ fn dedup_store_keys(labels: &[&str]) -> Vec<String> {
     labels
         .iter()
         .map(|label| {
-            let count = seen
-                .entry(label)
-                .and_modify(|c| *c += 1)
-                .or_insert(1);
+            let count = seen.entry(label).and_modify(|c| *c += 1).or_insert(1);
             if *count == 1 {
                 label.to_string()
             } else {
