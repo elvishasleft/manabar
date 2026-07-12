@@ -1,0 +1,53 @@
+name: macOS
+
+# Deliberately not run on every push/PR: macOS runner minutes cost ~10x
+# Windows/Linux, so this only runs on demand or when cutting a release tag.
+# Windows CI (ci.yml) is unaffected and unchanged.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-test-and-smoke:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: npm ci
+      - run: npm run build
+      - run: cargo fmt --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Run workspace test suite (includes the macOS Keychain test)
+        run: cargo test --workspace
+
+      - name: Build .app + .dmg
+        run: npm run tauri build -- --bundles app,dmg
+
+      - name: Launch smoke test
+        run: |
+          set -e
+          open target/release/bundle/macos/QuotaBar.app
+          sleep 15
+          pgrep -x quotabar || pgrep -f QuotaBar
+          screencapture -x /tmp/mac-smoke.png
+          pkill -f QuotaBar || true
+
+      - name: Upload .dmg artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: quotabar-dmg
+          path: target/release/bundle/dmg/*.dmg
+
+      - name: Upload launch smoke screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-smoke-screenshot
+          path: /tmp/mac-smoke.png

@@ -2,7 +2,9 @@ use quotabar_core::model::ProviderView;
 use std::time::{Duration, Instant};
 
 /// Windows `CREATE_NO_WINDOW` flag: suppresses the console window a spawned
-/// `cmd.exe` would otherwise flash open.
+/// `cmd.exe` would otherwise flash open. Windows-only: `creation_flags` is a
+/// `CommandExt` method that only exists on the Windows target.
+#[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// Timeout for the sign-in refresh CLI spawn. The CLIs themselves complete
@@ -43,6 +45,10 @@ pub async fn panel_opened(
 /// provider identifiers, so there is no injection surface. Returns `None`
 /// for providers without a local refresh CLI (e.g. `codex`) or unknown
 /// input.
+///
+/// Windows spawns via `cmd /C` (matches the existing `taskkill /T` process-
+/// tree kill in `kill_signin_cli`, which is itself Windows-only).
+#[cfg(windows)]
 pub(crate) fn signin_argv(kind: &str) -> Option<Vec<String>> {
     let tail: &[&str] = match kind {
         "claude" => &["claude", "-p", "hi", "--max-turns", "1"],
@@ -52,6 +58,26 @@ pub(crate) fn signin_argv(kind: &str) -> Option<Vec<String>> {
     let mut argv = vec!["cmd".to_string(), "/C".to_string()];
     argv.extend(tail.iter().map(|s| s.to_string()));
     Some(argv)
+}
+
+/// macOS spawns via `/bin/zsh -lc "<command>"`: GUI apps on macOS don't
+/// inherit the user's shell `PATH` (Finder/launchd launch them with a
+/// minimal environment), and `-l` makes zsh load the login profile so
+/// `claude`/`grok` resolve the same way they would from a Terminal prompt.
+/// Both commands are fixed strings — no interpolation of `kind` or any
+/// other input into the shell command text.
+#[cfg(target_os = "macos")]
+pub(crate) fn signin_argv(kind: &str) -> Option<Vec<String>> {
+    let command = match kind {
+        "claude" => "claude -p \"hi\" --max-turns 1",
+        "grok" => "grok -p \"hi\"",
+        _ => return None,
+    };
+    Some(vec![
+        "/bin/zsh".to_string(),
+        "-lc".to_string(),
+        command.to_string(),
+    ])
 }
 
 /// Result of running the sign-in CLI to completion (or giving up).
@@ -164,6 +190,7 @@ pub async fn refresh_signin(
 mod tests {
     use super::*;
 
+    #[cfg(windows)]
     #[test]
     fn claude_argv_is_fixed_and_trivial() {
         assert_eq!(
@@ -180,6 +207,7 @@ mod tests {
         );
     }
 
+    #[cfg(windows)]
     #[test]
     fn grok_argv_is_fixed_and_trivial() {
         assert_eq!(
@@ -190,6 +218,32 @@ mod tests {
                 "grok".to_string(),
                 "-p".to_string(),
                 "hi".to_string(),
+            ])
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn claude_argv_is_fixed_zsh_login_shell() {
+        assert_eq!(
+            signin_argv("claude"),
+            Some(vec![
+                "/bin/zsh".to_string(),
+                "-lc".to_string(),
+                "claude -p \"hi\" --max-turns 1".to_string(),
+            ])
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn grok_argv_is_fixed_zsh_login_shell() {
+        assert_eq!(
+            signin_argv("grok"),
+            Some(vec![
+                "/bin/zsh".to_string(),
+                "-lc".to_string(),
+                "grok -p \"hi\"".to_string(),
             ])
         );
     }

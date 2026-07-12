@@ -20,8 +20,63 @@ fn read_json(path: &Path) -> Result<serde_json::Value, ProviderError> {
         .map_err(|e| ProviderError::SchemaChanged(format!("parse {}: {e}", path.display())))
 }
 
-pub fn claude_token(home: &Path) -> Result<Token, ProviderError> {
-    let v = read_json(&home.join(".claude").join(".credentials.json"))?;
+/// macOS Keychain service name Claude Code stores its OAuth blob under —
+/// the same JSON shape as the plaintext `.credentials.json` file used on
+/// other platforms (and on macOS installs that still have the file).
+#[cfg(target_os = "macos")]
+const CLAUDE_KEYCHAIN_SERVICE: &str = "Claude Code-credentials";
+
+/// Reads a generic password's stored data from the macOS login Keychain via
+/// the `security` CLI, trimming the trailing newline `security -w` emits.
+/// Returns `None` on any failure (no such entry, locked keychain, `security`
+/// missing, non-UTF8 output) — the caller treats that the same as a missing
+/// credentials file, i.e. `ProviderError::NoCredentials`.
+#[cfg(target_os = "macos")]
+fn keychain_blob(service: &str) -> Option<String> {
+    let output = std::process::Command::new("security")
+        .args(["find-generic-password", "-s", service, "-w"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8(output.stdout).ok()?;
+    let trimmed = text.trim_end_matches(['\n', '\r']);
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+/// Resolves the Claude credentials JSON text: the plaintext file first (some
+/// macOS installs still have it, and it's the only source on Windows/Linux),
+/// falling back on macOS — only when the file is *missing* — to the login
+/// Keychain entry `security` maintains for Claude Code. A file that exists
+/// but fails to read/parse is reported as-is rather than silently falling
+/// through to the Keychain.
+fn claude_credentials_text(home: &Path) -> Result<String, ProviderError> {
+    let path = home.join(".claude").join(".credentials.json");
+    if path.exists() {
+        return std::fs::read_to_string(&path)
+            .map_err(|e| ProviderError::SchemaChanged(format!("read {}: {e}", path.display())));
+    }
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(blob) = keychain_blob(CLAUDE_KEYCHAIN_SERVICE) {
+            return Ok(blob);
+        }
+    }
+    Err(ProviderError::NoCredentials)
+}
+
+/// Shared JSON-parsing logic for the Claude OAuth blob, used by both the
+/// plaintext-file path (all platforms) and the macOS Keychain fallback —
+/// the two sources carry byte-identical JSON, so there is exactly one
+/// parser to keep correct and test.
+fn claude_token_from_json(text: &str) -> Result<Token, ProviderError> {
+    let v: serde_json::Value = serde_json::from_str(text)
+        .map_err(|e| ProviderError::SchemaChanged(format!("parse claude credentials: {e}")))?;
     let oauth = v
         .get("claudeAiOauth")
         .ok_or_else(|| ProviderError::SchemaChanged("missing claudeAiOauth".into()))?;
@@ -44,6 +99,11 @@ pub fn claude_token(home: &Path) -> Result<Token, ProviderError> {
         plan_hint,
         account_id: None,
     })
+}
+
+pub fn claude_token(home: &Path) -> Result<Token, ProviderError> {
+    let text = claude_credentials_text(home)?;
+    claude_token_from_json(&text)
 }
 
 fn codex_auth_path(home: &Path, codex_home_env: Option<&str>) -> std::path::PathBuf {
@@ -247,5 +307,73 @@ mod tests {
         assert_eq!(resolve_deepseek_key(None, None), None);
         assert_eq!(resolve_deepseek_key(Some(""), Some("")), None);
         assert_eq!(resolve_deepseek_key(Some(""), None), None);
+    }
+
+    /// Deletes a macOS Keychain generic-password entry on drop, so the
+    /// `keychain_roundtrip` test below cleans up its synthetic entry even if
+    /// an assertion panics partway through.
+    #[cfg(target_os = "macos")]
+    struct KeychainCleanup {
+        account: &'static str,
+        service: &'static str,
+    }
+
+    #[cfg(target_os = "macos")]
+    impl Drop for KeychainCleanup {
+        fn drop(&mut self) {
+            let _ = std::process::Command::new("security")
+                .args([
+                    "delete-generic-password",
+                    "-a",
+                    self.account,
+                    "-s",
+                    self.service,
+                ])
+                .status();
+        }
+    }
+
+    /// Exercises the real macOS Keychain via the `security` CLI: writes a
+    /// synthetic Claude OAuth blob under a throwaway service name, reads it
+    /// back through `keychain_blob`, parses it with the same
+    /// `claude_token_from_json` the file path uses, and cleans up (even on
+    /// assertion failure, via `KeychainCleanup`'s `Drop`). Runs only on
+    /// macOS CI runners (an unlocked login keychain is assumed there);
+    /// Windows/Linux builds don't compile or run this test at all.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn keychain_roundtrip() {
+        const ACCOUNT: &str = "quotabar-test";
+        const SERVICE: &str = "quotabar-test-svc";
+        let synthetic = r#"{"claudeAiOauth":{"accessToken":"tok-keychain","expiresAt":1783753082456,"subscriptionType":"max"}}"#;
+
+        let add = std::process::Command::new("security")
+            .args([
+                "add-generic-password",
+                "-a",
+                ACCOUNT,
+                "-s",
+                SERVICE,
+                "-w",
+                synthetic,
+                "-U",
+            ])
+            .status()
+            .expect("security add-generic-password should run");
+        assert!(
+            add.success(),
+            "security add-generic-password should succeed"
+        );
+        let _cleanup = KeychainCleanup {
+            account: ACCOUNT,
+            service: SERVICE,
+        };
+
+        let blob = keychain_blob(SERVICE).expect("keychain_blob should read back the entry");
+        let result = claude_token_from_json(&blob).expect("synthetic json should parse");
+
+        assert_eq!(result.bearer, "tok-keychain");
+        assert_eq!(result.plan_hint.as_deref(), Some("max"));
+        assert_eq!(result.expires_at.unwrap().timestamp_millis(), 1783753082456);
     }
 }

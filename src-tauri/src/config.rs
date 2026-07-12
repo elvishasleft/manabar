@@ -60,6 +60,10 @@ pub struct Config {
     pub deepseek_api_key: Option<String>,
     pub deepseek_budget: Option<f64>,
     pub thresholds: ThresholdsConfig,
+    /// macOS-only: shows `"{letter} {percent}%"` next to the tray icon in
+    /// the menu bar (see `tray::menubar_title`). Ignored on Windows, where
+    /// there is no menu bar text concept. Defaults to `true`.
+    pub menubar_text: bool,
 }
 
 impl Default for Config {
@@ -71,6 +75,7 @@ impl Default for Config {
             deepseek_api_key: None,
             deepseek_budget: None,
             thresholds: ThresholdsConfig::default(),
+            menubar_text: true,
         }
     }
 }
@@ -156,6 +161,7 @@ mod tests {
         assert!(cfg.deepseek_api_key.is_none());
         assert!(cfg.deepseek_budget.is_none());
         assert_eq!(cfg.thresholds, ThresholdsConfig::default());
+        assert!(cfg.menubar_text, "menubar_text defaults to true");
     }
 
     #[test]
@@ -210,6 +216,22 @@ mod tests {
         .unwrap();
         let cfg = load(&path);
         assert_eq!(cfg.thresholds, ThresholdsConfig::default());
+    }
+
+    #[test]
+    fn old_config_without_menubar_text_key_still_loads() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        std::fs::write(
+            &path,
+            r#"{"poll_interval_secs":1800,"enabled":{"claude":true,"codex":true,"grok":true,"deepseek":true},"price_overrides":[],"deepseek_api_key":null,"deepseek_budget":null,"thresholds":{"amber":30.0,"red":10.0}}"#,
+        )
+        .unwrap();
+        let cfg = load(&path);
+        assert!(
+            cfg.menubar_text,
+            "pre-v0.4 config without a menubar_text key must still load, defaulting to true"
+        );
     }
 
     #[test]
