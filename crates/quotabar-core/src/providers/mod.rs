@@ -5,7 +5,7 @@ pub mod grok;
 
 use crate::model::{DayUsage, Health, ProviderError, ProviderKind, ProviderView, QuotaSnapshot};
 use crate::pricing::PriceTable;
-use crate::quota_math::health_for;
+use crate::quota_math::{health_for, Thresholds};
 use crate::usage_logs::{aggregate_dir, LogCache};
 use chrono::{Duration, NaiveDate};
 use std::path::PathBuf;
@@ -155,25 +155,30 @@ pub fn initial_view(kind: ProviderKind) -> ProviderView {
         error_kind: None,
         usage: None,
         updated_at: None,
+        enabled: true,
     }
 }
 
 pub fn update_view(
     prev: &ProviderView,
     result: Result<QuotaSnapshot, ProviderError>,
+    thresholds: &Thresholds,
 ) -> ProviderView {
     match result {
         Ok(snap) => {
             let remaining = snap.binding_remaining_percent();
             ProviderView {
                 kind: prev.kind,
-                health: remaining.map(health_for).unwrap_or(Health::Unavailable),
+                health: remaining
+                    .map(|r| health_for(r, thresholds))
+                    .unwrap_or(Health::Unavailable),
                 remaining_percent: remaining,
                 updated_at: Some(snap.fetched_at),
                 quota: Some(snap),
                 error: None,
                 error_kind: None,
                 usage: prev.usage.clone(),
+                enabled: prev.enabled,
             }
         }
         Err(e) => {
@@ -192,6 +197,7 @@ pub fn update_view(
                 error_kind: Some(kind_str.into()),
                 usage: prev.usage.clone(),
                 updated_at: prev.updated_at,
+                enabled: prev.enabled,
             }
         }
     }
@@ -219,7 +225,7 @@ mod tests {
     #[test]
     fn ok_result_sets_health_and_clears_error() {
         let v0 = initial_view(ProviderKind::Claude);
-        let v1 = update_view(&v0, Ok(snap(20.0)));
+        let v1 = update_view(&v0, Ok(snap(20.0)), &Thresholds::default());
         assert_eq!(v1.health, Health::Green);
         assert_eq!(v1.remaining_percent, Some(80.0));
         assert!(v1.error.is_none());
@@ -230,9 +236,13 @@ mod tests {
     #[test]
     fn error_keeps_last_good_quota() {
         let v0 = initial_view(ProviderKind::Codex);
-        let v1 = update_view(&v0, Ok(snap(95.0)));
+        let v1 = update_view(&v0, Ok(snap(95.0)), &Thresholds::default());
         assert_eq!(v1.health, Health::Red);
-        let v2 = update_view(&v1, Err(ProviderError::Network("boom".into())));
+        let v2 = update_view(
+            &v1,
+            Err(ProviderError::Network("boom".into())),
+            &Thresholds::default(),
+        );
         assert_eq!(v2.health, Health::Unavailable);
         assert_eq!(v2.error_kind.as_deref(), Some("network"));
         assert!(v2.quota.is_some(), "last good snapshot retained");
@@ -248,8 +258,51 @@ mod tests {
             (ProviderError::Network("x".into()), "network"),
             (ProviderError::SchemaChanged("x".into()), "schema_changed"),
         ] {
-            assert_eq!(update_view(&v0, Err(err)).error_kind.as_deref(), Some(kind));
+            assert_eq!(
+                update_view(&v0, Err(err), &Thresholds::default())
+                    .error_kind
+                    .as_deref(),
+                Some(kind)
+            );
         }
+    }
+
+    #[test]
+    fn initial_view_is_enabled_by_default() {
+        assert!(initial_view(ProviderKind::Claude).enabled);
+    }
+
+    #[test]
+    fn update_view_preserves_enabled_flag_across_ok_and_err() {
+        let mut v0 = initial_view(ProviderKind::Claude);
+        v0.enabled = false;
+        let v1 = update_view(&v0, Ok(snap(20.0)), &Thresholds::default());
+        assert!(!v1.enabled, "Ok branch must preserve prev.enabled");
+        let v2 = update_view(
+            &v1,
+            Err(ProviderError::Network("boom".into())),
+            &Thresholds::default(),
+        );
+        assert!(!v2.enabled, "Err branch must preserve prev.enabled");
+    }
+
+    #[test]
+    fn update_view_respects_custom_thresholds() {
+        let v0 = initial_view(ProviderKind::Claude);
+        let custom = Thresholds {
+            amber: 50.0,
+            red: 20.0,
+        };
+        // 60% remaining (used=40) is Green under defaults (>30) but also
+        // Green under a custom amber=50 threshold; pick a value that
+        // differs from the default classification to prove the param is
+        // actually used rather than defaulted internally.
+        let v1 = update_view(&v0, Ok(snap(60.0)), &custom); // remaining = 40%
+        assert_eq!(
+            v1.health,
+            Health::Amber,
+            "40% remaining is Amber under amber=50/red=20, but would be Green under defaults"
+        );
     }
 
     #[test]

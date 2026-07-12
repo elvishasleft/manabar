@@ -1,4 +1,4 @@
-use quotabar_core::model::{ProviderKind, ProviderView};
+use quotabar_core::model::{Health, ProviderKind, ProviderView};
 use tauri::image::Image;
 use tauri::menu::{CheckMenuItem, MenuBuilder, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -16,9 +16,12 @@ pub fn provider_name(kind: ProviderKind) -> &'static str {
     }
 }
 
+/// Disabled providers are omitted entirely, not shown as a dash — they're
+/// meant to disappear from the tray, not just read as unavailable.
 pub fn tooltip_string(views: &[ProviderView]) -> String {
     views
         .iter()
+        .filter(|v| v.enabled)
         .map(|v| match v.remaining_percent {
             Some(p) => format!("{} {}%", provider_name(v.kind), p.round() as i64),
             None => format!("{} —", provider_name(v.kind)),
@@ -27,24 +30,21 @@ pub fn tooltip_string(views: &[ProviderView]) -> String {
         .join(" · ")
 }
 
-fn remaining_array(views: &[ProviderView]) -> [Option<f64>; 4] {
-    let get = |k: ProviderKind| {
-        views
-            .iter()
-            .find(|v| v.kind == k)
-            .and_then(|v| v.remaining_percent)
-    };
-    [
-        get(ProviderKind::Claude),
-        get(ProviderKind::Codex),
-        get(ProviderKind::Grok),
-        get(ProviderKind::DeepSeek),
-    ]
+/// One `(remaining_percent, health)` pair per *enabled* provider, in the
+/// same order they appear in `views` (which is `default_providers`' fixed
+/// Claude/Codex/Grok/DeepSeek order) — disabled providers contribute no
+/// entry at all, so `icon::render_tray_icon` draws no bar for them.
+fn enabled_bars(views: &[ProviderView]) -> Vec<(Option<f64>, Health)> {
+    views
+        .iter()
+        .filter(|v| v.enabled)
+        .map(|v| (v.remaining_percent, v.health))
+        .collect()
 }
 
 pub fn update_tray(app: &tauri::AppHandle, views: &[ProviderView]) {
     if let Some(tray) = app.tray_by_id("main") {
-        let rgba = crate::icon::render_tray_icon(remaining_array(views));
+        let rgba = crate::icon::render_tray_icon(&enabled_bars(views));
         let _ = tray.set_icon(Some(Image::new_owned(
             rgba,
             crate::icon::ICON_SIZE,
@@ -111,7 +111,13 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     let menu = MenuBuilder::new(app)
         .items(&[&refresh, &autostart, &quit])
         .build()?;
-    let rgba = crate::icon::render_tray_icon([None, None, None, None]);
+    // Placeholder icon shown before the first poll completes. Sized to the
+    // number of currently-enabled providers (AppShared is already managed
+    // by the time create_tray runs) so a fully-disabled config doesn't
+    // briefly flash 4 gray bars before poll_and_publish redraws it.
+    let shared = app.state::<crate::AppShared>();
+    let placeholder = vec![(None, Health::Unavailable); shared.enabled_count()];
+    let rgba = crate::icon::render_tray_icon(&placeholder);
     TrayIconBuilder::with_id("main")
         .icon(Image::new_owned(
             rgba,
@@ -154,7 +160,6 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use quotabar_core::model::{Health, ProviderKind};
     use quotabar_core::providers::initial_view;
 
     #[test]
@@ -173,6 +178,34 @@ mod tests {
             tooltip_string(&[v1, v2, v3, v4]),
             "Claude 82% · Codex — · Grok 95% · DeepSeek 60%"
         );
+    }
+
+    #[test]
+    fn tooltip_omits_disabled_providers_entirely() {
+        let mut v1 = initial_view(ProviderKind::Claude);
+        v1.remaining_percent = Some(82.4);
+        v1.health = Health::Green;
+        let mut v2 = initial_view(ProviderKind::Codex);
+        v2.enabled = false; // disabled: must be absent, not "Codex —"
+        let mut v3 = initial_view(ProviderKind::Grok);
+        v3.remaining_percent = Some(95.0);
+        v3.health = Health::Green;
+        assert_eq!(
+            tooltip_string(&[v1, v2, v3]),
+            "Claude 82% · Grok 95%",
+            "disabled provider must not appear at all"
+        );
+    }
+
+    #[test]
+    fn enabled_bars_filters_out_disabled_providers() {
+        let mut v1 = initial_view(ProviderKind::Claude);
+        v1.remaining_percent = Some(50.0);
+        v1.health = Health::Green;
+        let mut v2 = initial_view(ProviderKind::Codex);
+        v2.enabled = false;
+        let bars = enabled_bars(&[v1, v2]);
+        assert_eq!(bars, vec![(Some(50.0), Health::Green)]);
     }
 
     #[test]

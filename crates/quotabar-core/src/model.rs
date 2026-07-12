@@ -73,4 +73,10 @@ pub struct ProviderView {
     pub error_kind: Option<String>,
     pub usage: Option<UsageStats>,
     pub updated_at: Option<DateTime<Utc>>,
+    /// Whether this provider is enabled in config. `false` means the shell's
+    /// tray icon and panel should omit it entirely rather than showing an
+    /// unavailable/gray placeholder — see `providers::initial_view` and
+    /// `providers::update_view`, which set/preserve this from config-derived
+    /// state rather than from poll results.
+    pub enabled: bool,
 }
