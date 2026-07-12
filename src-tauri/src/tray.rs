@@ -119,7 +119,7 @@ pub fn update_tray(app: &tauri::AppHandle, views: &[ProviderView], _menubar_text
 /// (unit-tested for both variants on every CI target, even though only one
 /// variant is ever constructed by non-test code on a given platform).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+#[allow(dead_code)] // each platform constructs only its own variant; both are unit-tested
 pub(crate) enum Anchor {
     BottomRight,
     TopRight,
