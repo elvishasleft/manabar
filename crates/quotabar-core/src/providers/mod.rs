@@ -1,12 +1,13 @@
 pub mod claude;
 pub mod codex;
+pub mod deepseek;
 pub mod grok;
 
-use crate::model::{Health, ProviderError, ProviderKind, ProviderView, QuotaSnapshot};
+use crate::model::{DayUsage, Health, ProviderError, ProviderKind, ProviderView, QuotaSnapshot};
 use crate::pricing::PriceTable;
 use crate::quota_math::health_for;
 use crate::usage_logs::{aggregate_dir, LogCache};
-use chrono::NaiveDate;
+use chrono::{Duration, NaiveDate};
 use std::path::PathBuf;
 
 #[async_trait::async_trait]
@@ -96,11 +97,51 @@ impl QuotaProvider for grok::GrokProvider {
     }
 }
 
-pub fn default_providers(home: PathBuf) -> Vec<Box<dyn QuotaProvider>> {
+#[async_trait::async_trait]
+impl QuotaProvider for deepseek::DeepSeekProvider {
+    fn kind(&self) -> ProviderKind {
+        ProviderKind::DeepSeek
+    }
+    async fn fetch_quota(&self, http: &reqwest::Client) -> Result<QuotaSnapshot, ProviderError> {
+        deepseek::DeepSeekProvider::fetch_quota(self, http).await
+    }
+    /// DeepSeek's official balance endpoint carries no per-model usage-log
+    /// signal (the omp logs it drives are out of scope for v0.2), so this
+    /// returns a zero-filled 7-day window for trait-signature completeness
+    /// only. `AppShared::refresh_usage` in the shell explicitly skips
+    /// assigning this to the view, so the panel's usage/sparkline block
+    /// never renders for DeepSeek.
+    fn fetch_usage(
+        &self,
+        _cache: &mut LogCache,
+        _prices: &PriceTable,
+        today: NaiveDate,
+    ) -> crate::model::UsageStats {
+        let days = (0..7)
+            .map(|i| DayUsage {
+                date: today - Duration::days(6 - i),
+                input_tokens: 0,
+                output_tokens: 0,
+                est_cost_usd: None,
+            })
+            .collect();
+        crate::model::UsageStats { days }
+    }
+}
+
+pub fn default_providers(
+    home: PathBuf,
+    deepseek_key: Option<String>,
+    deepseek_budget: Option<f64>,
+) -> Vec<Box<dyn QuotaProvider>> {
     vec![
         Box::new(claude::ClaudeProvider::new(home.clone())),
         Box::new(codex::CodexProvider::new(home.clone())),
         Box::new(grok::GrokProvider::new(home)),
+        Box::new(deepseek::DeepSeekProvider::new(
+            deepseek_key,
+            deepseek_budget,
+        )),
     ]
 }
 
@@ -211,15 +252,16 @@ mod tests {
     }
 
     #[test]
-    fn default_providers_order_is_claude_codex_grok() {
-        let ps = default_providers(std::path::PathBuf::from("C:/nonexistent"));
+    fn default_providers_order_is_claude_codex_grok_deepseek() {
+        let ps = default_providers(std::path::PathBuf::from("C:/nonexistent"), None, None);
         let kinds: Vec<ProviderKind> = ps.iter().map(|p| p.kind()).collect();
         assert_eq!(
             kinds,
             vec![
                 ProviderKind::Claude,
                 ProviderKind::Codex,
-                ProviderKind::Grok
+                ProviderKind::Grok,
+                ProviderKind::DeepSeek,
             ]
         );
     }

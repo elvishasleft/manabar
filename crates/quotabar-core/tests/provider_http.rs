@@ -271,3 +271,46 @@ async fn grok_401_maps_to_token_expired() {
         Err(ProviderError::TokenExpired)
     ));
 }
+
+use quotabar_core::providers::deepseek::DeepSeekProvider;
+
+#[tokio::test]
+async fn deepseek_fetch_happy_path() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/user/balance"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(include_str!("fixtures/deepseek_balance.json")),
+        )
+        .mount(&server)
+        .await;
+    let p = DeepSeekProvider {
+        base_url: server.uri(),
+        key_override: Some("test-key".into()),
+        budget: None,
+    };
+    let snap = p.fetch_quota(&client()).await.unwrap();
+    assert_eq!(snap.windows.len(), 1);
+    assert_eq!(snap.windows[0].label, "Balance");
+    assert_eq!(snap.windows[0].used_percent, 0.0);
+    assert_eq!(snap.plan.as_deref(), Some("¥97.97"));
+}
+
+#[tokio::test]
+async fn deepseek_401_maps_to_token_expired() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(401))
+        .mount(&server)
+        .await;
+    let p = DeepSeekProvider {
+        base_url: server.uri(),
+        key_override: Some("test-key".into()),
+        budget: None,
+    };
+    assert!(matches!(
+        p.fetch_quota(&client()).await,
+        Err(ProviderError::TokenExpired)
+    ));
+}

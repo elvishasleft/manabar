@@ -10,7 +10,7 @@ type DayUsage = {
   est_cost_usd: number | null;
 };
 type View = {
-  kind: "claude" | "codex" | "grok";
+  kind: "claude" | "codex" | "grok" | "deepseek";
   health: "green" | "amber" | "red" | "unavailable";
   remaining_percent: number | null;
   quota: Quota | null;
@@ -20,8 +20,18 @@ type View = {
   updated_at: string | null;
 };
 
-const NAMES: Record<View["kind"], string> = { claude: "Claude", codex: "Codex", grok: "Grok" };
-const CLI: Record<View["kind"], string> = { claude: "Claude Code", codex: "Codex", grok: "Grok" };
+const NAMES: Record<View["kind"], string> = {
+  claude: "Claude",
+  codex: "Codex",
+  grok: "Grok",
+  deepseek: "DeepSeek",
+};
+const CLI: Record<View["kind"], string> = {
+  claude: "Claude Code",
+  codex: "Codex",
+  grok: "Grok",
+  deepseek: "DeepSeek",
+};
 
 const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -54,7 +64,11 @@ function errorCopy(v: View): string {
     case "no_credentials":
       return "Not installed / not signed in";
     case "token_expired":
-      return `Sign-in expired — open ${CLI[v.kind]} to refresh`;
+      // DeepSeek has no local sign-in CLI to "open" — its auth is a static
+      // API key, so the expired-token hint points at the env var instead.
+      return v.kind === "deepseek"
+        ? "API key invalid — check DEEPSEEK_API_KEY"
+        : `Sign-in expired — open ${CLI[v.kind]} to refresh`;
     case "network":
       return `Offline — retrying (last data ${age(v.updated_at) || "never"})`;
     case "schema_changed":
@@ -84,7 +98,11 @@ function ring(pct: number | null, health: View["health"]): string {
   const circumference = 2 * Math.PI * r;
   const known = pct != null;
   const clamped = known ? Math.max(0, Math.min(100, pct)) : 0;
-  const offset = known ? circumference * (1 - clamped / 100) : circumference;
+  // The stroke arc is floored at a small minimum so 0% remaining still shows
+  // a visible sliver of its health color instead of vanishing entirely; the
+  // label below keeps showing the true rounded value, unaffected by this.
+  const arcPct = known ? Math.max(clamped, 2.5) : 0;
+  const offset = known ? circumference * (1 - arcPct / 100) : circumference;
   const label = known ? String(Math.round(clamped)) : "—";
   return `
     <div class="ring health-${health}">
@@ -123,8 +141,8 @@ function canRefreshSignin(v: View): boolean {
   return v.error_kind === "token_expired" && (v.kind === "claude" || v.kind === "grok");
 }
 
-// v.kind is a closed enum ("claude" | "codex" | "grok"), so it's safe to
-// inline into the data attribute without escaping.
+// v.kind is a closed enum ("claude" | "codex" | "grok" | "deepseek"), so
+// it's safe to inline into the data attribute without escaping.
 function refreshButtonHtml(v: View): string {
   if (!canRefreshSignin(v)) return "";
   if (pendingRefresh.has(v.kind)) {

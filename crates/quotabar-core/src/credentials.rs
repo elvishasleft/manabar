@@ -108,6 +108,27 @@ pub fn grok_token(home: &Path) -> Result<Token, ProviderError> {
     })
 }
 
+/// Pure resolution rule for the DeepSeek API key: env wins when non-blank,
+/// otherwise fall back to the config-supplied key, otherwise `None`. Kept
+/// free of `std::env::var` so it's hermetically unit-testable — same
+/// pattern as `codex_auth_path`.
+pub fn resolve_deepseek_key(env: Option<&str>, cfg: Option<&str>) -> Option<String> {
+    if let Some(e) = env {
+        if !e.trim().is_empty() {
+            return Some(e.to_string());
+        }
+    }
+    cfg.filter(|c| !c.trim().is_empty()).map(str::to_string)
+}
+
+/// Resolves the DeepSeek API key from `DEEPSEEK_API_KEY` (preferred) or the
+/// config's `deepseek_api_key` fallback. Missing/blank in both places is
+/// `NoCredentials`, consistent with the other providers' missing-auth state.
+pub fn deepseek_key(config_key: Option<&str>) -> Result<String, ProviderError> {
+    let env = std::env::var("DEEPSEEK_API_KEY").ok();
+    resolve_deepseek_key(env.as_deref(), config_key).ok_or(ProviderError::NoCredentials)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -195,5 +216,36 @@ mod tests {
             grok_token(dir.path()),
             Err(ProviderError::SchemaChanged(_))
         ));
+    }
+
+    #[test]
+    fn deepseek_key_prefers_env_over_config() {
+        assert_eq!(
+            resolve_deepseek_key(Some("env-key"), Some("cfg-key")),
+            Some("env-key".to_string())
+        );
+    }
+
+    #[test]
+    fn deepseek_key_blank_env_falls_back_to_config() {
+        assert_eq!(
+            resolve_deepseek_key(Some(""), Some("cfg-key")),
+            Some("cfg-key".to_string())
+        );
+        assert_eq!(
+            resolve_deepseek_key(Some("   "), Some("cfg-key")),
+            Some("cfg-key".to_string())
+        );
+        assert_eq!(
+            resolve_deepseek_key(None, Some("cfg-key")),
+            Some("cfg-key".to_string())
+        );
+    }
+
+    #[test]
+    fn deepseek_key_both_missing_is_none() {
+        assert_eq!(resolve_deepseek_key(None, None), None);
+        assert_eq!(resolve_deepseek_key(Some(""), Some("")), None);
+        assert_eq!(resolve_deepseek_key(Some(""), None), None);
     }
 }

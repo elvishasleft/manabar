@@ -8,6 +8,7 @@ pub struct Enabled {
     pub claude: bool,
     pub codex: bool,
     pub grok: bool,
+    pub deepseek: bool,
 }
 
 impl Default for Enabled {
@@ -16,6 +17,7 @@ impl Default for Enabled {
             claude: true,
             codex: true,
             grok: true,
+            deepseek: true,
         }
     }
 }
@@ -35,6 +37,8 @@ pub struct Config {
     pub poll_interval_secs: u64,
     pub enabled: Enabled,
     pub price_overrides: Vec<PriceOverride>,
+    pub deepseek_api_key: Option<String>,
+    pub deepseek_budget: Option<f64>,
 }
 
 impl Default for Config {
@@ -43,6 +47,8 @@ impl Default for Config {
             poll_interval_secs: 1800,
             enabled: Enabled::default(),
             price_overrides: vec![],
+            deepseek_api_key: None,
+            deepseek_budget: None,
         }
     }
 }
@@ -99,8 +105,12 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let cfg = load(&dir.path().join("nope.json"));
         assert_eq!(cfg.poll_interval_secs, 1800);
-        assert!(cfg.enabled.claude && cfg.enabled.codex && cfg.enabled.grok);
+        assert!(
+            cfg.enabled.claude && cfg.enabled.codex && cfg.enabled.grok && cfg.enabled.deepseek
+        );
         assert!(cfg.price_overrides.is_empty());
+        assert!(cfg.deepseek_api_key.is_none());
+        assert!(cfg.deepseek_budget.is_none());
     }
 
     #[test]
@@ -113,12 +123,30 @@ mod tests {
                 codex: false,
                 ..Enabled::default()
             },
+            deepseek_api_key: Some("sk-test".into()),
+            deepseek_budget: Some(200.0),
             ..Config::default()
         };
         save(&path, &cfg).unwrap();
         assert_eq!(load(&path), cfg);
         std::fs::write(&path, "garbage{{{").unwrap();
         assert_eq!(load(&path), Config::default());
+    }
+
+    #[test]
+    fn old_config_without_deepseek_fields_still_loads() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        std::fs::write(
+            &path,
+            r#"{"poll_interval_secs":900,"enabled":{"claude":true,"codex":true,"grok":true},"price_overrides":[]}"#,
+        )
+        .unwrap();
+        let cfg = load(&path);
+        assert_eq!(cfg.poll_interval_secs, 900);
+        assert!(cfg.enabled.deepseek, "deepseek enabled defaults to true");
+        assert!(cfg.deepseek_api_key.is_none());
+        assert!(cfg.deepseek_budget.is_none());
     }
 
     #[test]
