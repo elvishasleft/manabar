@@ -31,11 +31,14 @@ fn currency_prefix(currency: &str) -> String {
 /// `balance_infos[0]`) is `SchemaChanged`, matching how the other providers
 /// treat an unparseable-but-2xx response.
 ///
-/// Semantics are balance-based, not window-based: with a `budget` configured,
-/// `used_percent = (1 - balance/budget) * 100`, clamped to 0-100. Without a
-/// budget, it's a binary green/red signal from `is_available` alone: 0% used
-/// (green) while DeepSeek reports the account usable, 100% (red) once it
-/// doesn't. `resets_at` is always `None` — a balance has no reset schedule.
+/// Semantics are balance-based, not window-based: with a `budget` configured
+/// and strictly positive, `used_percent = (1 - balance/budget) * 100`,
+/// clamped to 0-100. Without a usable budget (`None`, zero, or negative —
+/// dividing by a non-positive budget is meaningless and would otherwise
+/// yield `NaN`/nonsensical ratios), it's a binary green/red signal from
+/// `is_available` alone: 0% used (green) while DeepSeek reports the account
+/// usable, 100% (red) once it doesn't. `resets_at` is always `None` — a
+/// balance has no reset schedule.
 pub fn parse_balance(
     body: &str,
     budget: Option<f64>,
@@ -50,8 +53,8 @@ pub fn parse_balance(
         ProviderError::SchemaChanged(format!("deepseek balance: bad total_balance: {e}"))
     })?;
     let used_percent = match budget {
-        Some(b) => ((1.0 - balance / b) * 100.0).clamp(0.0, 100.0),
-        None => {
+        Some(b) if b > 0.0 => ((1.0 - balance / b) * 100.0).clamp(0.0, 100.0),
+        _ => {
             if raw.is_available {
                 0.0
             } else {
@@ -136,6 +139,40 @@ mod tests {
             "expected ~51.015, got {}",
             snap.windows[0].used_percent
         );
+    }
+
+    #[test]
+    fn zero_budget_with_zero_balance_falls_back_to_binary_unavailable() {
+        // budget = Some(0.0), balance = "0.00": naive (1 - 0/0)*100 is NaN.
+        // Must fall back to the is_available binary instead of NaN/100.
+        let body = r#"{"is_available":false,"balance_infos":[{"currency":"CNY","total_balance":"0.00","granted_balance":"0.00","topped_up_balance":"0.00"}]}"#;
+        let snap = parse_balance(body, Some(0.0), Utc::now()).unwrap();
+        assert_eq!(snap.windows[0].used_percent, 100.0);
+    }
+
+    #[test]
+    fn zero_budget_with_zero_balance_and_available_falls_back_to_binary_available() {
+        // Same invalid budget, but is_available=true: fallback binary is 0%,
+        // not the NaN the naive ratio math would have produced.
+        let body = r#"{"is_available":true,"balance_infos":[{"currency":"CNY","total_balance":"0.00","granted_balance":"0.00","topped_up_balance":"0.00"}]}"#;
+        let snap = parse_balance(body, Some(0.0), Utc::now()).unwrap();
+        assert_eq!(snap.windows[0].used_percent, 0.0);
+    }
+
+    #[test]
+    fn negative_budget_falls_back_to_binary_logic() {
+        let body = r#"{"is_available":false,"balance_infos":[{"currency":"CNY","total_balance":"0.00","granted_balance":"0.00","topped_up_balance":"0.00"}]}"#;
+        let snap = parse_balance(body, Some(-5.0), Utc::now()).unwrap();
+        assert_eq!(snap.windows[0].used_percent, 100.0);
+    }
+
+    #[test]
+    fn positive_budget_with_zero_balance_uses_real_math() {
+        // A genuinely positive budget with zero balance is fully used: real
+        // ratio math applies here, not the fallback binary.
+        let body = r#"{"is_available":false,"balance_infos":[{"currency":"CNY","total_balance":"0.00","granted_balance":"0.00","topped_up_balance":"0.00"}]}"#;
+        let snap = parse_balance(body, Some(100.0), Utc::now()).unwrap();
+        assert_eq!(snap.windows[0].used_percent, 100.0);
     }
 
     #[test]

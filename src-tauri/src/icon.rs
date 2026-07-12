@@ -42,7 +42,7 @@ pub fn render_tray_icon(remaining: [Option<f64>; 4]) -> Vec<u8> {
             Some(pct) => {
                 let pct = pct.clamp(0.0, 100.0);
                 let mut fill = ((TRACK_HEIGHT as f64) * pct / 100.0).ceil() as usize;
-                if pct > 0.0 && fill == 0 {
+                if fill == 0 {
                     fill = 1;
                 }
                 let color = fill_color(pct);
@@ -101,5 +101,18 @@ mod tests {
     fn amber_between_10_and_30() {
         let buf = render_tray_icon([Some(20.0), Some(20.0), Some(20.0), Some(20.0)]);
         assert_eq!(px(&buf, 4, 28), AMBER);
+    }
+
+    #[test]
+    fn zero_percent_remaining_still_shows_one_pixel_of_red() {
+        // Regression: pct == 0.0 must still render a visible sliver of its
+        // health color at the bottom of the bar, not an all-TRACK bar that
+        // looks indistinguishable from a healthy empty gauge.
+        let buf = render_tray_icon([Some(0.0), None, None, None]);
+        assert_eq!(
+            px(&buf, 4, 29),
+            RED,
+            "bottom fill pixel of a 0%-remaining bar must be red"
+        );
     }
 }

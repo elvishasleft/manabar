@@ -98,7 +98,11 @@ function ring(pct: number | null, health: View["health"]): string {
   const circumference = 2 * Math.PI * r;
   const known = pct != null;
   const clamped = known ? Math.max(0, Math.min(100, pct)) : 0;
-  const offset = known ? circumference * (1 - clamped / 100) : circumference;
+  // The stroke arc is floored at a small minimum so 0% remaining still shows
+  // a visible sliver of its health color instead of vanishing entirely; the
+  // label below keeps showing the true rounded value, unaffected by this.
+  const arcPct = known ? Math.max(clamped, 2.5) : 0;
+  const offset = known ? circumference * (1 - arcPct / 100) : circumference;
   const label = known ? String(Math.round(clamped)) : "—";
   return `
     <div class="ring health-${health}">
@@ -137,8 +141,8 @@ function canRefreshSignin(v: View): boolean {
   return v.error_kind === "token_expired" && (v.kind === "claude" || v.kind === "grok");
 }
 
-// v.kind is a closed enum ("claude" | "codex" | "grok"), so it's safe to
-// inline into the data attribute without escaping.
+// v.kind is a closed enum ("claude" | "codex" | "grok" | "deepseek"), so
+// it's safe to inline into the data attribute without escaping.
 function refreshButtonHtml(v: View): string {
   if (!canRefreshSignin(v)) return "";
   if (pendingRefresh.has(v.kind)) {
