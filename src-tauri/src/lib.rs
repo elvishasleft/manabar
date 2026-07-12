@@ -131,7 +131,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_state,
             commands::refresh_now,
-            commands::panel_opened
+            commands::panel_opened,
+            commands::refresh_signin
         ])
         .setup(|app| {
             let cfg_path = config::config_path();
