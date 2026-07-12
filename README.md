@@ -171,6 +171,30 @@ source at all (it's driven internally by omp), so its card omits the
 usage/sparkline block entirely — its own account balance is the whole
 story.
 
+## Burn-rate ETA and low-quota notifications
+
+Each panel window line can append a `· runs out ~14:32` estimate: a linear
+projection from the last two polls of that window (`(curr_used - prev_used)
+/ Δt`), shown only when the projected exhaustion time is earlier than the
+window's own reset. It needs **at least two polls at least 60 seconds
+apart** to have a rate to fit — on a fresh install, or right after a poll
+interval change, the first poll has nothing to compare against, so no ETA
+shows yet. In on-demand mode (`poll_interval_secs: 0`) that means opening
+the panel twice; the same applies after a data gap longer than 48 hours,
+which is treated as stale rather than extrapolated from.
+
+The last two samples per provider+window are persisted to
+`%APPDATA%\quotabar\state.json` (next to `config.json`, but shell-managed —
+not meant to be hand-edited) so the estimate survives app restarts instead
+of resetting to nothing every launch.
+
+QuotaBar also sends a Windows notification the moment a provider's health
+*worsens* into amber or red (not on every poll while it stays amber/red, and
+not on improvement) — e.g. `Claude: 28% left (5h), runs out ~14:32`. Like
+everything else, this only fires when a poll actually happens: in on-demand
+mode that's startup, panel open, or `Refresh now` — there is no hidden
+background polling to enable notifications between those events.
+
 ## Development
 
 ```bash

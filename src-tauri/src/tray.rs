@@ -5,18 +5,23 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::Manager;
 use tauri_plugin_autostart::ManagerExt;
 
-pub fn tooltip_string(views: &[ProviderView]) -> String {
-    let name = |k: ProviderKind| match k {
+/// Display name for a provider, shared by the tray tooltip and the
+/// low-quota notification body so both read the same names.
+pub fn provider_name(kind: ProviderKind) -> &'static str {
+    match kind {
         ProviderKind::Claude => "Claude",
         ProviderKind::Codex => "Codex",
         ProviderKind::Grok => "Grok",
         ProviderKind::DeepSeek => "DeepSeek",
-    };
+    }
+}
+
+pub fn tooltip_string(views: &[ProviderView]) -> String {
     views
         .iter()
         .map(|v| match v.remaining_percent {
-            Some(p) => format!("{} {}%", name(v.kind), p.round() as i64),
-            None => format!("{} —", name(v.kind)),
+            Some(p) => format!("{} {}%", provider_name(v.kind), p.round() as i64),
+            None => format!("{} —", provider_name(v.kind)),
         })
         .collect::<Vec<_>>()
         .join(" · ")

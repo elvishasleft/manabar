@@ -210,6 +210,7 @@ mod tests {
                 label: "5h".into(),
                 used_percent: used,
                 resets_at: None,
+                exhaust_eta: None,
             }],
             fetched_at: Utc::now(),
         }

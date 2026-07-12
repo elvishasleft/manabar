@@ -1,7 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
-type RateWindow = { label: string; used_percent: number; resets_at: string | null };
+type RateWindow = {
+  label: string;
+  used_percent: number;
+  resets_at: string | null;
+  exhaust_eta: string | null;
+};
 type Quota = { plan: string | null; windows: RateWindow[]; fetched_at: string };
 type DayUsage = {
   date: string;
@@ -51,6 +56,18 @@ function countdown(resetsAt: string | null): string {
   if (d > 0) return `resets in ${d}d ${h}h`;
   if (h > 0) return `resets in ${h}h ${m}m`;
   return `resets in ${Math.max(m, 1)}m`;
+}
+
+// `exhaustEta` is an ISO date string from our own backend (see
+// RateWindow.exhaust_eta in model.rs) — parsed via `new Date()` and only the
+// resulting numeric hour/minute digits are interpolated, so no HTML-escaping
+// is needed here.
+function etaLabel(exhaustEta: string | null): string {
+  if (!exhaustEta) return "";
+  const d = new Date(exhaustEta);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `runs out ~${hh}:${mm}`;
 }
 
 function age(iso: string | null): string {
@@ -120,7 +137,12 @@ function ring(pct: number | null, health: View["health"]): string {
 // Parts are filtered so a window without a resets_at still reads cleanly.
 function windowLine(w: RateWindow): string {
   const remaining = Math.round(100 - w.used_percent);
-  const parts = [esc(w.label), `${remaining}% left`, countdown(w.resets_at)].filter(Boolean);
+  const parts = [
+    esc(w.label),
+    `${remaining}% left`,
+    countdown(w.resets_at),
+    etaLabel(w.exhaust_eta),
+  ].filter(Boolean);
   return `<div class="win-line">${parts.join(" · ")}</div>`;
 }
 

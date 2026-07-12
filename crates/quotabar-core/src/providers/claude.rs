@@ -47,6 +47,7 @@ fn window(label: &str, raw: WindowRaw) -> RateWindow {
         label: label.to_string(),
         used_percent: raw.utilization,
         resets_at: parse_resets_at(raw.resets_at),
+        exhaust_eta: None,
     }
 }
 
@@ -83,6 +84,7 @@ fn limit_window(entry: LimitRaw) -> Option<RateWindow> {
         label: limit_label(&entry.kind, entry.scope.as_ref()),
         used_percent: percent,
         resets_at: parse_resets_at(entry.resets_at),
+        exhaust_eta: None,
     })
 }
 
