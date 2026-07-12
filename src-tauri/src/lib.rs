@@ -74,6 +74,13 @@ impl AppShared {
         provider_enabled(&self.cfg, kind)
     }
 
+    /// Whether the macOS menu bar title (letter + percent) should be shown
+    /// alongside the tray icon. Read from config; ignored on Windows, where
+    /// `tray::update_tray` never calls `set_title` regardless of this value.
+    pub(crate) fn menubar_text(&self) -> bool {
+        self.cfg.menubar_text
+    }
+
     /// Count of currently-enabled providers, used to size the placeholder
     /// tray icon shown before the first poll completes (see
     /// `tray::create_tray`). Synchronous and lock-free — it only reads
@@ -329,7 +336,7 @@ async fn poll_and_publish(app: &tauri::AppHandle) {
     let shared = app.state::<AppShared>();
     shared.poll_quotas().await;
     let views = shared.views().await;
-    tray::update_tray(app, &views);
+    tray::update_tray(app, &views, shared.menubar_text());
     notify_health_transitions(app, &shared, &views).await;
     let _ = app.emit("state", &views);
 }

@@ -1,10 +1,14 @@
 # QuotaBar
 
-A Windows system-tray app that shows, at a glance, how much subscription
+A Windows and macOS tray app that shows, at a glance, how much subscription
 quota you have left on three AI coding assistants — **Claude Code**
 (Anthropic), **Codex CLI** (OpenAI), and **Grok CLI** (xAI) — plus
 **DeepSeek** account balance, via a flyout panel with per-window detail
-and estimated token/cost usage over the last 7 days.
+and estimated token/cost usage over the last 7 days. On macOS the menu bar
+can also show a letter + percent for whichever enabled provider is closest
+to running out — see [macOS](#macos) below. The macOS build is compiled,
+tested, and smoke-launched on GitHub Actions' Apple-silicon runners on every
+release; final validation on physical Mac hardware is still pending.
 
 ![QuotaBar panel](docs/screenshot.png)
 
@@ -34,11 +38,13 @@ Hovering the icon shows a tooltip, e.g.
 `Claude 82% · Codex 35% · Grok 95% · DeepSeek 60%` — an *enabled* provider
 that's unavailable shows as `Codex —`, but a *disabled* provider doesn't
 appear in the tooltip at all. Left-click opens the panel; right-click
-gives `Refresh now`, `Start with Windows`, and `Quit`.
+gives `Refresh now`, an autostart toggle (`Start with Windows` on
+Windows, `Start at Login` on macOS), and `Quit`.
 
 ## Requirements
 
-- Windows 10/11.
+- Windows 10/11, or macOS on Apple Silicon (see [macOS](#macos) below for
+  install/Gatekeeper/menu-bar specifics).
 - At least one of the following, signed in locally:
   - [Claude Code](https://docs.claude.com/en/docs/claude-code) (`%USERPROFILE%\.claude\`)
   - [Codex CLI](https://github.com/openai/codex) (`%USERPROFILE%\.codex\`)
@@ -92,11 +98,47 @@ cp target/release/build/webview2-com-sys-*/out/x64/WebView2Loader.dll target/rel
 Once this repo is public, a prebuilt installer will be attached to
 GitHub Releases instead.
 
+## macOS
+
+macOS support targets Apple Silicon (arm64) only; Intel (x86_64), code
+signing/notarization, and the App Store are out of scope for now.
+
+- **Install:** download the `.dmg`, open it, and drag `QuotaBar.app` into
+  `Applications` (or run it directly from the mounted volume). The build is
+  unsigned/not notarized, so Gatekeeper blocks a plain double-click the
+  first time — **right-click `QuotaBar.app` → Open**, then confirm in the
+  dialog (or, if that dialog doesn't appear, allow it via **System
+  Settings → Privacy & Security → "Open Anyway"**). This is only needed
+  once; subsequent launches (including autostart) work normally.
+- **Menu bar icon + text:** the tray shows the same four health-colored
+  bars as Windows, plus — when `menubar_text` is enabled (default) — a
+  text label next to the icon: `{letter} {percent}%` for whichever
+  *enabled* provider is currently the binding constraint (lowest remaining
+  percent). Letters: **C**=Claude, **X**=Codex, **G**=Grok,
+  **D**=DeepSeek. If the binding provider is unavailable it shows
+  `{letter} —`; if every enabled provider is unavailable it shows a plain
+  `—`. Set `"menubar_text": false` in config for an icon-only menu bar.
+  Clicking the icon opens the panel anchored just below the menu bar
+  (top-right), rather than above the taskbar as on Windows.
+- **Claude credentials via Keychain:** some Claude Code installs on macOS
+  store the OAuth token in the login Keychain (service
+  `Claude Code-credentials`) instead of the plaintext
+  `~/.claude/.credentials.json` file used elsewhere. QuotaBar checks the
+  file first and only falls back to reading the Keychain entry (via the
+  `security` CLI, read-only, same as the file path) when the file doesn't
+  exist — no extra unlock step should be needed beyond your normal login
+  session.
+- **Sign-in refresh:** the tray's `Refresh sign-in` action spawns
+  `claude`/`grok` through a `/bin/zsh -lc` login shell (GUI apps on macOS
+  don't inherit your Terminal's `PATH` by default), matching the same
+  fixed, trivial prompt used on Windows.
+
 ## Configuration
 
-QuotaBar reads `%APPDATA%\quotabar\config.json` once at startup (created
-with defaults on first run if missing; invalid JSON falls back to defaults
-rather than crashing). There is no in-app settings UI in v1 — edit the
+QuotaBar reads `%APPDATA%\quotabar\config.json` once at startup (on macOS:
+`~/Library/Application Support/quotabar/config.json`) — created with
+defaults on first run if missing; invalid JSON falls back to defaults
+rather than crashing. There is no in-app settings UI in v1 — edit the
 file and restart QuotaBar for changes (including `poll_interval_secs`) to
 take effect. `Refresh now` does not reload config; it only triggers an
 immediate extra poll using the interval already in memory.
@@ -124,7 +166,8 @@ immediate extra poll using the interval already in memory.
   "thresholds": {
     "amber": 30.0,
     "red": 10.0
-  }
+  },
+  "menubar_text": true
 }
 ```
 
@@ -136,6 +179,7 @@ immediate extra poll using the interval already in memory.
 | `thresholds.amber` / `thresholds.red` | number | `30.0` / `10.0` | Health-color boundaries, as a remaining-percent cutoff: green above `amber`, amber above `red`, red at or below `red`. Must satisfy `0.0 ≤ red < amber ≤ 100.0` — an invalid combination (inverted/equal, negative, or over 100) is logged as a warning and the built-in 30/10 defaults are used instead for that run. |
 | `deepseek_api_key` | string or `null` | `null` | Fallback DeepSeek API key, used only when the `DEEPSEEK_API_KEY` environment variable isn't set (or is blank). The environment variable always wins when present. |
 | `deepseek_budget` | number or `null` | `null` | Optional total balance budget (same currency as your DeepSeek account, e.g. CNY) for turning the `Balance` window into a real used-percent gauge: `used% = (1 - balance/budget) × 100`, clamped 0-100. Without a budget, DeepSeek's card is a binary green/red signal from the account's own `is_available` flag — 0% used while usable, 100% once DeepSeek reports it can't serve requests. |
+| `menubar_text` | bool | `true` | **macOS only** (ignored on Windows). Shows `"{letter} {percent}%"` next to the tray icon in the menu bar for the binding provider — see [macOS](#macos) above. Set to `false` for an icon-only menu bar. |
 
 ## How it works
 
@@ -145,7 +189,7 @@ the same unofficial usage endpoints those CLIs use internally:
 
 | Provider | Credentials (read-only) | Quota endpoint | Cumulative usage source |
 |---|---|---|---|
-| Claude Code | `%USERPROFILE%\.claude\.credentials.json` | `GET https://api.anthropic.com/api/oauth/usage` (Bearer token + `anthropic-beta: oauth-2025-04-20`) — primary: `limits[]` array (`session` / `weekly_all` / `weekly_scoped`, the latter carrying a per-model `scope.model.display_name` weekly window); fallback: legacy `five_hour`, `seven_day`, `seven_day_sonnet`, `seven_day_opus`, `extra_usage`; plan from `subscriptionType` | `%USERPROFILE%\.claude\projects\**\*.jsonl` |
+| Claude Code | `%USERPROFILE%\.claude\.credentials.json` (macOS: falls back to the login Keychain entry `Claude Code-credentials` when that file doesn't exist — see [macOS](#macos)) | `GET https://api.anthropic.com/api/oauth/usage` (Bearer token + `anthropic-beta: oauth-2025-04-20`) — primary: `limits[]` array (`session` / `weekly_all` / `weekly_scoped`, the latter carrying a per-model `scope.model.display_name` weekly window); fallback: legacy `five_hour`, `seven_day`, `seven_day_sonnet`, `seven_day_opus`, `extra_usage`; plan from `subscriptionType` | `%USERPROFILE%\.claude\projects\**\*.jsonl` |
 | Codex CLI | `%USERPROFILE%\.codex\auth.json`, or `$CODEX_HOME\auth.json` when the `CODEX_HOME` environment variable is set | `GET https://chatgpt.com/backend-api/wham/usage` (Bearer token) — `rate_limit.primary_window` (5h), `secondary_window` (weekly), `additional_rate_limits[]` (per-model, paid plans) | `%USERPROFILE%\.codex\sessions\**\*.jsonl` |
 | Grok CLI | `%USERPROFILE%\.grok\auth.json` (keyed by `issuer::client_id`, token field `key`) | `GET https://cli-chat-proxy.grok.com/v1/billing?format=credits` (`config.creditUsagePercent`, `currentPeriod.end`) + `GET .../v1/settings` (plan label) | `%USERPROFILE%\.grok\sessions\**\signals.json` (`contextTokensUsed`, `primaryModelId`) |
 | DeepSeek | `DEEPSEEK_API_KEY` environment variable, or `deepseek_api_key` in config | `GET https://api.deepseek.com/user/balance` (Bearer token) — **the one official, documented endpoint of the four**; `balance_infos[0].total_balance` (a string) becomes the `Balance` window and the plan pill (e.g. `¥97.97`) | none — DeepSeek's card has no usage/sparkline block (`usage: null`); driven internally by omp, out of scope |
