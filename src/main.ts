@@ -10,7 +10,7 @@ type DayUsage = {
   est_cost_usd: number | null;
 };
 type View = {
-  kind: "claude" | "codex" | "grok";
+  kind: "claude" | "codex" | "grok" | "deepseek";
   health: "green" | "amber" | "red" | "unavailable";
   remaining_percent: number | null;
   quota: Quota | null;
@@ -20,8 +20,18 @@ type View = {
   updated_at: string | null;
 };
 
-const NAMES: Record<View["kind"], string> = { claude: "Claude", codex: "Codex", grok: "Grok" };
-const CLI: Record<View["kind"], string> = { claude: "Claude Code", codex: "Codex", grok: "Grok" };
+const NAMES: Record<View["kind"], string> = {
+  claude: "Claude",
+  codex: "Codex",
+  grok: "Grok",
+  deepseek: "DeepSeek",
+};
+const CLI: Record<View["kind"], string> = {
+  claude: "Claude Code",
+  codex: "Codex",
+  grok: "Grok",
+  deepseek: "DeepSeek",
+};
 
 const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -54,7 +64,11 @@ function errorCopy(v: View): string {
     case "no_credentials":
       return "Not installed / not signed in";
     case "token_expired":
-      return `Sign-in expired — open ${CLI[v.kind]} to refresh`;
+      // DeepSeek has no local sign-in CLI to "open" — its auth is a static
+      // API key, so the expired-token hint points at the env var instead.
+      return v.kind === "deepseek"
+        ? "API key invalid — check DEEPSEEK_API_KEY"
+        : `Sign-in expired — open ${CLI[v.kind]} to refresh`;
     case "network":
       return `Offline — retrying (last data ${age(v.updated_at) || "never"})`;
     case "schema_changed":

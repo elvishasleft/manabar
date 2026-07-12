@@ -10,6 +10,7 @@ pub fn tooltip_string(views: &[ProviderView]) -> String {
         ProviderKind::Claude => "Claude",
         ProviderKind::Codex => "Codex",
         ProviderKind::Grok => "Grok",
+        ProviderKind::DeepSeek => "DeepSeek",
     };
     views
         .iter()
@@ -21,7 +22,7 @@ pub fn tooltip_string(views: &[ProviderView]) -> String {
         .join(" · ")
 }
 
-fn remaining_array(views: &[ProviderView]) -> [Option<f64>; 3] {
+fn remaining_array(views: &[ProviderView]) -> [Option<f64>; 4] {
     let get = |k: ProviderKind| {
         views
             .iter()
@@ -32,6 +33,7 @@ fn remaining_array(views: &[ProviderView]) -> [Option<f64>; 3] {
         get(ProviderKind::Claude),
         get(ProviderKind::Codex),
         get(ProviderKind::Grok),
+        get(ProviderKind::DeepSeek),
     ]
 }
 
@@ -104,7 +106,7 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     let menu = MenuBuilder::new(app)
         .items(&[&refresh, &autostart, &quit])
         .build()?;
-    let rgba = crate::icon::render_tray_icon([None, None, None]);
+    let rgba = crate::icon::render_tray_icon([None, None, None, None]);
     TrayIconBuilder::with_id("main")
         .icon(Image::new_owned(
             rgba,
@@ -159,9 +161,12 @@ mod tests {
         let mut v3 = initial_view(ProviderKind::Grok);
         v3.remaining_percent = Some(95.0);
         v3.health = Health::Green;
+        let mut v4 = initial_view(ProviderKind::DeepSeek);
+        v4.remaining_percent = Some(60.0);
+        v4.health = Health::Green;
         assert_eq!(
-            tooltip_string(&[v1, v2, v3]),
-            "Claude 82% · Codex — · Grok 95%"
+            tooltip_string(&[v1, v2, v3, v4]),
+            "Claude 82% · Codex — · Grok 95% · DeepSeek 60%"
         );
     }
 

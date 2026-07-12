@@ -24,7 +24,7 @@ pub struct AppShared {
 
 impl AppShared {
     fn new(cfg: config::Config, home: std::path::PathBuf) -> Self {
-        let providers = default_providers(home);
+        let providers = default_providers(home, cfg.deepseek_api_key.clone(), cfg.deepseek_budget);
         let views = providers.iter().map(|p| initial_view(p.kind())).collect();
         Self {
             views: tokio::sync::RwLock::new(views),
@@ -42,6 +42,7 @@ impl AppShared {
             ProviderKind::Claude => self.cfg.enabled.claude,
             ProviderKind::Codex => self.cfg.enabled.codex,
             ProviderKind::Grok => self.cfg.enabled.grok,
+            ProviderKind::DeepSeek => self.cfg.enabled.deepseek,
         }
     }
 
@@ -59,7 +60,13 @@ impl AppShared {
         {
             let mut cache = self.log_cache.lock().await;
             for p in self.providers.iter() {
-                if self.enabled(p.kind()) {
+                // DeepSeek's official balance endpoint carries no usage-log
+                // signal (omp logs are out of scope for v0.2), so its view's
+                // `usage` stays `None` even when enabled — the panel then
+                // renders no usage/sparkline block for that card. The trait
+                // impl still returns zero days for signature completeness;
+                // this guard is what keeps it out of the view.
+                if self.enabled(p.kind()) && p.kind() != ProviderKind::DeepSeek {
                     computed.push(Some(p.fetch_usage(&mut cache, &self.prices, today)));
                 } else {
                     computed.push(None);

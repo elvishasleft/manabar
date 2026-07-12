@@ -1,5 +1,7 @@
 use quotabar_core::http::client;
-use quotabar_core::providers::{claude::ClaudeProvider, codex::CodexProvider, grok::GrokProvider};
+use quotabar_core::providers::{
+    claude::ClaudeProvider, codex::CodexProvider, deepseek::DeepSeekProvider, grok::GrokProvider,
+};
 use std::path::PathBuf;
 
 fn real_home() -> PathBuf {
@@ -39,4 +41,17 @@ async fn live_grok() {
         .expect("grok live fetch failed");
     println!("grok: {snap:#?}");
     assert!(!snap.windows.is_empty());
+}
+
+#[tokio::test]
+#[ignore = "hits real endpoints with the real DEEPSEEK_API_KEY env var; run manually"]
+async fn live_deepseek() {
+    let p = DeepSeekProvider::new(None, None);
+    let snap = p
+        .fetch_quota(&client())
+        .await
+        .expect("deepseek live fetch failed - is DEEPSEEK_API_KEY set?");
+    println!("deepseek: {snap:#?}");
+    assert!(!snap.windows.is_empty());
+    assert_eq!(snap.windows[0].label, "Balance");
 }

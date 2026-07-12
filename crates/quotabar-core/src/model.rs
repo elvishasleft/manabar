@@ -7,6 +7,7 @@ pub enum ProviderKind {
     Claude,
     Codex,
     Grok,
+    DeepSeek,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
