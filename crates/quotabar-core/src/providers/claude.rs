@@ -117,9 +117,7 @@ pub fn parse_quota(
     // `limits` is absent, null, or empty (older API responses).
     let limits = raw.limits.take();
     let windows = match limits {
-        Some(limits) if !limits.is_empty() => {
-            limits.into_iter().filter_map(limit_window).collect()
-        }
+        Some(limits) if !limits.is_empty() => limits.into_iter().filter_map(limit_window).collect(),
         _ => legacy_windows(raw),
     };
 
