@@ -12,6 +12,8 @@ on:
 jobs:
   build-test-and-smoke:
     runs-on: macos-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -51,3 +53,11 @@ jobs:
         with:
           name: mac-smoke-screenshot
           path: /tmp/mac-smoke.png
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --title "QuotaBar $GITHUB_REF_NAME" --notes "Automated release. macOS: terminal install via scripts/install-mac.sh (see README). Unsigned builds." || true
+          gh release upload "$GITHUB_REF_NAME" target/release/bundle/dmg/*.dmg --clobber

@@ -103,11 +103,28 @@ GitHub Releases instead.
 macOS support targets Apple Silicon (arm64) only; Intel (x86_64), code
 signing/notarization, and the App Store are out of scope for now.
 
-- **Install:** download the `.dmg`, open it, and drag `QuotaBar.app` into
-  `Applications` (or run it directly from the mounted volume). The build is
-  unsigned/not notarized, so Gatekeeper blocks a plain double-click the
-  first time — **right-click `QuotaBar.app` → Open**, then confirm in the
-  dialog (or, if that dialog doesn't appear, allow it via **System
+- **Install / upgrade (terminal, recommended):** one-time setup —
+  `brew install gh && gh auth login` (this repo is private, so `gh`
+  needs to be authenticated as a collaborator; the script below reads
+  through that same `gh` session). Then, to install or upgrade to the
+  latest release in one command:
+
+  ```bash
+  gh api -H "Accept: application/vnd.github.raw" repos/arteeeezy/quotabar/contents/scripts/install-mac.sh | bash
+  ```
+
+  This downloads the latest `.dmg` release asset, replaces
+  `/Applications/QuotaBar.app`, strips the Gatekeeper quarantine
+  attribute (`xattr -dr com.apple.quarantine`) so there's no
+  right-click-Open dance, and launches the app. Re-run the same
+  command any time to upgrade to the newest release.
+- **Install (manual, fallback):** download the `.dmg` from
+  [Releases](https://github.com/arteeeezy/quotabar/releases), open it,
+  and drag `QuotaBar.app` into `Applications` (or run it directly from
+  the mounted volume). The build is unsigned/not notarized, so
+  Gatekeeper blocks a plain double-click the first time —
+  **right-click `QuotaBar.app` → Open**, then confirm in the dialog
+  (or, if that dialog doesn't appear, allow it via **System
   Settings → Privacy & Security → "Open Anyway"**). This is only needed
   once; subsequent launches (including autostart) work normally.
 - **Menu bar icon + text:** the tray shows the same four health-colored
