@@ -8,12 +8,15 @@ pub const RED: [u8; 4] = [226, 75, 74, 255];
 pub const GRAY: [u8; 4] = [110, 110, 106, 255];
 pub const TRACK: [u8; 4] = [68, 68, 65, 140];
 
-/// Fixed bar geometry: 6px-wide bars with 2px gaps between them, so N bars
-/// span `8*N - 2` px, centered horizontally in the 32px-wide icon. With the
-/// pre-v0.3 fixed count of 4 this reduces to the original hard-coded
-/// layout (margin 1, bars at x ∈ {[1,7), [9,15), [17,23), [25,31)}).
-const BAR_WIDTH: usize = 6;
-const BAR_GAP: usize = 2;
+/// Fixed bar geometry: 7px-wide bars with 1px gaps between them, so N bars
+/// span `8*N - 1` px, centered horizontally in the 32px-wide icon. With the
+/// v0.4 fixed count of 4 this is `31` px total; `(32 - 31) / 2 == 0` under
+/// integer division, so the margin rounds down to 0 rather than splitting
+/// evenly (bars at x ∈ {[0,7), [8,15), [16,23), [24,31)}, leaving a single
+/// unused column at x=31) — a deliberate, accepted asymmetry rather than a
+/// bug, since centering 31 px in 32 can't be perfectly even.
+const BAR_WIDTH: usize = 7;
+const BAR_GAP: usize = 1;
 const TRACK_TOP: usize = 2;
 const TRACK_BOTTOM: usize = 30; // exclusive
 const TRACK_HEIGHT: usize = TRACK_BOTTOM - TRACK_TOP;
@@ -149,35 +152,52 @@ mod tests {
     }
 
     #[test]
-    fn three_bars_are_centered_with_margin_5() {
-        // total = 8*3 - 2 = 22, margin = (32 - 22) / 2 = 5.
+    fn three_bars_are_centered_with_margin_4() {
+        // total = 7*3 + 1*2 = 23, margin = (32 - 23) / 2 = 4.
         let buf = render_tray_icon(&[
             (Some(100.0), Health::Green),
             (Some(100.0), Health::Green),
             (Some(100.0), Health::Green),
         ]);
-        assert_eq!(px(&buf, 4, 15)[3], 0, "just left of first bar is empty");
-        assert_eq!(px(&buf, 5, 15), GREEN, "first bar starts at x=5");
+        assert_eq!(px(&buf, 3, 15)[3], 0, "just left of first bar is empty");
+        assert_eq!(px(&buf, 4, 15), GREEN, "first bar starts at x=4");
         assert_eq!(px(&buf, 10, 15), GREEN, "first bar ends at x=10");
         assert_eq!(px(&buf, 11, 15)[3], 0, "gap after first bar is empty");
-        assert_eq!(px(&buf, 13, 15), GREEN, "second bar starts at x=13");
+        assert_eq!(px(&buf, 12, 15), GREEN, "second bar starts at x=12");
     }
 
     #[test]
-    fn one_bar_is_centered_with_margin_13() {
-        // total = 8*1 - 2 = 6, margin = (32 - 6) / 2 = 13.
+    fn one_bar_is_centered_with_margin_12() {
+        // total = 7*1 + 1*0 = 7, margin = (32 - 7) / 2 = 12.
         let buf = render_tray_icon(&[(Some(100.0), Health::Green)]);
         assert_eq!(
-            px(&buf, 12, 15)[3],
+            px(&buf, 11, 15)[3],
             0,
             "just left of the single bar is empty"
         );
-        assert_eq!(px(&buf, 13, 15), GREEN, "bar starts at x=13");
+        assert_eq!(px(&buf, 12, 15), GREEN, "bar starts at x=12");
         assert_eq!(px(&buf, 18, 15), GREEN, "bar ends at x=18");
         assert_eq!(
             px(&buf, 19, 15)[3],
             0,
             "just right of the single bar is empty"
+        );
+    }
+
+    #[test]
+    fn four_bars_span_the_full_width_with_zero_margin() {
+        // total = 7*4 + 1*3 = 31, margin = (32 - 31) / 2 = 0 (integer
+        // division rounds the odd leftover column to the right edge).
+        let buf = render_tray_icon(&[(Some(100.0), Health::Green); 4]);
+        assert_eq!(px(&buf, 0, 15), GREEN, "first bar starts at x=0");
+        assert_eq!(px(&buf, 6, 15), GREEN, "first bar ends at x=6");
+        assert_eq!(px(&buf, 7, 15)[3], 0, "gap after first bar is empty");
+        assert_eq!(px(&buf, 24, 15), GREEN, "fourth bar starts at x=24");
+        assert_eq!(px(&buf, 30, 15), GREEN, "fourth bar ends at x=30");
+        assert_eq!(
+            px(&buf, 31, 15)[3],
+            0,
+            "the one leftover column at x=31 is unused"
         );
     }
 
