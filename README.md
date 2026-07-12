@@ -60,8 +60,10 @@ Windows, `Start at Login` on macOS), and `Quit`.
 
 ## Install
 
-This repo is currently private with no published GitHub Release yet, so
-build from source:
+Prebuilt installers are attached to
+[Releases](https://github.com/arteeeezy/quotabar/releases) (repo is
+private — collaborators only; macOS has a terminal one-liner, see
+[macOS](#macos)). On Windows you can also build from source:
 
 ```bash
 git clone https://github.com/arteeeezy/quotabar.git
