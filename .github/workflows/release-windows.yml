@@ -1,0 +1,29 @@
+name: Windows release
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+jobs:
+  build-and-publish:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: npm ci
+      - run: npm run build
+      - run: npm run tauri build
+      - name: Publish release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create "$GITHUB_REF_NAME" --title "QuotaBar $GITHUB_REF_NAME" --notes "Automated release." || true
+          cp target/release/quotabar.exe "QuotaBar_${GITHUB_REF_NAME#v}_portable.exe"
+          gh release upload "$GITHUB_REF_NAME" target/release/bundle/nsis/*-setup.exe "QuotaBar_${GITHUB_REF_NAME#v}_portable.exe" --clobber

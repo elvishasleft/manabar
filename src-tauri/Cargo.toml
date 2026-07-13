@@ -25,6 +25,7 @@ quotabar-core = { path = "../crates/quotabar-core" }
 chrono = { version = "0.4", features = ["serde"] }
 dirs = "6"
 tauri-plugin-autostart = "2"
+tauri-plugin-single-instance = "2"
 tokio = { version = "1", features = ["sync", "time", "macros", "rt"] }
 tauri-plugin-log = "2"
 tauri-plugin-notification = "2"

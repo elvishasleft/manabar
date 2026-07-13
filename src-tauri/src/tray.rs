@@ -157,26 +157,41 @@ pub(crate) fn panel_position(
     (x.max(work_pos.0), y.max(work_pos.1))
 }
 
-pub fn toggle_panel(app: &tauri::AppHandle) {
+/// Shows, positions, and focuses the panel window — the "make it visible
+/// and give it focus" half of `toggle_panel`, factored out so the
+/// single-instance handler (a second launch should focus the existing
+/// panel, not toggle it shut if it happened to already be open) and
+/// `toggle_panel` itself can share the exact same show behavior.
+pub fn show_panel(app: &tauri::AppHandle) {
     use tauri::Emitter;
     if let Some(w) = app.get_webview_window("panel") {
-        if w.is_visible().unwrap_or(false) {
-            let _ = w.hide();
-        } else {
-            if let (Ok(Some(monitor)), Ok(win_size)) = (w.current_monitor(), w.outer_size()) {
-                let work_area = monitor.work_area();
-                let (x, y) = panel_position(
-                    (work_area.position.x, work_area.position.y),
-                    (work_area.size.width, work_area.size.height),
-                    (win_size.width, win_size.height),
-                    PANEL_ANCHOR,
-                );
-                let _ = w.set_position(tauri::PhysicalPosition::new(x, y));
-            }
-            let _ = w.show();
-            let _ = w.set_focus();
-            let _ = app.emit("panel-shown", ());
+        if let (Ok(Some(monitor)), Ok(win_size)) = (w.current_monitor(), w.outer_size()) {
+            let work_area = monitor.work_area();
+            let (x, y) = panel_position(
+                (work_area.position.x, work_area.position.y),
+                (work_area.size.width, work_area.size.height),
+                (win_size.width, win_size.height),
+                PANEL_ANCHOR,
+            );
+            let _ = w.set_position(tauri::PhysicalPosition::new(x, y));
         }
+        let _ = w.show();
+        let _ = w.set_focus();
+        let _ = app.emit("panel-shown", ());
+    }
+}
+
+pub fn toggle_panel(app: &tauri::AppHandle) {
+    let is_visible = app
+        .get_webview_window("panel")
+        .and_then(|w| w.is_visible().ok())
+        .unwrap_or(false);
+    if is_visible {
+        if let Some(w) = app.get_webview_window("panel") {
+            let _ = w.hide();
+        }
+    } else {
+        show_panel(app);
     }
 }
 
