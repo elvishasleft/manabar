@@ -356,6 +356,14 @@ pub(crate) fn effective_poll_interval(secs: u64) -> Option<Duration> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Must be registered first, before any other plugin — a documented
+        // requirement of tauri-plugin-single-instance so it can intercept a
+        // second launch before the rest of the app initializes. A second
+        // launch attempt hands focus to the existing instance's panel
+        // instead of spawning a second tray icon.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            tray::show_panel(app);
+        }))
         .plugin(
             tauri_plugin_log::Builder::new()
                 .target(tauri_plugin_log::Target::new(

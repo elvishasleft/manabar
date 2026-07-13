@@ -347,18 +347,18 @@ body::-webkit-scrollbar-thumb:hover {
 .chart {
   display: block;
   width: 100%;
-  height: 44px;
+  height: 74px;
   overflow: visible;
 }
 
 .chart-bar {
   fill: var(--card-accent, var(--text-faint));
-  opacity: 0.55;
+  opacity: 0.45;
   transition: opacity var(--dur-fast) var(--ease-out);
 }
 
 .card:hover .chart-bar {
-  opacity: 0.72;
+  opacity: 0.6;
 }
 
 .chart-bar-today {
@@ -370,8 +370,18 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 .chart-bar-zero {
-  fill: var(--border-strong);
-  opacity: 1;
+  opacity: 0.15;
+}
+
+.card:hover .chart-bar-zero {
+  opacity: 0.25;
+}
+
+.chart-value {
+  font-size: 9px;
+  font-weight: 600;
+  fill: var(--text-muted);
+  font-variant-numeric: normal;
 }
 
 .chart-day {

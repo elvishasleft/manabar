@@ -84,6 +84,19 @@ To uninstall, use Windows' "Add or remove programs", or run
 the uninstaller next to the installed exe (NSIS default:
 `%LOCALAPPDATA%\QuotaBar\uninstall.exe`).
 
+**Portable:** no-install option — download `QuotaBar_<version>_portable.exe`
+from [Releases](https://github.com/arteeeezy/quotabar/releases) and run it
+directly; there's nothing to install or uninstall. Config still lives in
+`%APPDATA%\quotabar` (same place as the installed builds), so settings
+carry over if you later switch to an installer build. Because the
+autostart toggle registers the exe's *current* path, re-toggle
+**Start with Windows** after moving the portable exe to wherever it'll
+permanently live. This portable exe is built by CI on the MSVC
+toolchain, which statically links `WebView2Loader` — it's genuinely
+single-file. That's not true of a locally-built GNU-toolchain exe; see
+the GNU-toolchain note just below, where `WebView2Loader.dll` still has
+to sit next to it.
+
 Note for GNU-toolchain builds: if you compile with
 `x86_64-pc-windows-gnu` instead of the default MSVC toolchain, install
 from the MSI — the NSIS bundle currently omits `WebView2Loader.dll`,
@@ -97,6 +110,9 @@ WebView2Loader.dll was not found"): copy the DLL next to the exe once —
 cp target/release/build/webview2-com-sys-*/out/x64/WebView2Loader.dll target/release/
 ```
 
+**Single instance:** QuotaBar only ever runs one copy at a time. Launching
+it again — portable exe or installed shortcut — doesn't spawn a second
+tray icon; it just brings the existing instance's panel to the front.
 
 ## macOS
 
