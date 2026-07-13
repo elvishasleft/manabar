@@ -2238,7 +2238,7 @@ dependencies = [
 
 [[package]]
 name = "manabar"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "chrono",
  "dirs 6.0.0",
