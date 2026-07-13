@@ -19,14 +19,53 @@ pub struct SampleStore {
     pub samples: HashMap<String, HashMap<String, Sample>>,
 }
 
-/// `%APPDATA%\quotabar\state.json` — next to `config_path()`'s
+/// `%APPDATA%\manabar\state.json` — next to `config_path()`'s
 /// `config.json`, but written by the shell after every poll rather than
-/// edited by hand.
+/// edited by hand. Migrated automatically from the pre-rename
+/// `%APPDATA%\quotabar\state.json` if present — see `migrate_legacy`.
 pub fn state_path() -> PathBuf {
+    dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("manabar")
+        .join("state.json")
+}
+
+/// Pre-rename (QuotaBar, <= v0.5.x) state location. Read-only: consulted
+/// only by `migrate_legacy`, never written to.
+pub fn legacy_state_path() -> PathBuf {
     dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("quotabar")
         .join("state.json")
+}
+
+/// One-way, non-destructive migration run once at startup before `load`: if
+/// `new_path` is missing but `old_path` (the pre-rename QuotaBar location)
+/// exists, copies it to `new_path` so the rename doesn't reset burn-rate ETA
+/// history. The old file is left in place — this is a copy, never a move. A
+/// no-op when `new_path` already exists (new wins) or when neither exists
+/// (the caller's `load` then falls back to defaults).
+pub fn migrate_legacy(old_path: &Path, new_path: &Path) {
+    if new_path.exists() || !old_path.exists() {
+        return;
+    }
+    if let Some(parent) = new_path.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            log::warn!("failed to create state dir for migration: {e}");
+            return;
+        }
+    }
+    match std::fs::copy(old_path, new_path) {
+        Ok(_) => log::info!(
+            "migrated state from {} to {}",
+            old_path.display(),
+            new_path.display()
+        ),
+        Err(e) => log::warn!(
+            "failed to migrate legacy state from {}: {e}",
+            old_path.display()
+        ),
+    }
 }
 
 /// Loads the sample store, falling back to an empty default when the file
@@ -99,6 +138,92 @@ mod tests {
         let path = dir.path().join("nested").join("dir").join("state.json");
         save(&path, &SampleStore::default()).unwrap();
         assert!(path.exists());
+    }
+
+    #[test]
+    fn migrate_legacy_copies_when_new_missing_and_old_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let old = dir.path().join("quotabar").join("state.json");
+        let new = dir.path().join("manabar").join("state.json");
+        std::fs::create_dir_all(old.parent().unwrap()).unwrap();
+        let mut store = SampleStore::default();
+        store.samples.entry("claude".into()).or_default().insert(
+            "5h".into(),
+            Sample {
+                t_ms: 1,
+                used: 42.0,
+            },
+        );
+        save(&old, &store).unwrap();
+
+        migrate_legacy(&old, &new);
+
+        assert!(new.exists(), "new path should exist after migration");
+        assert!(
+            old.exists(),
+            "old path must be left in place (non-destructive)"
+        );
+        let loaded = load(&new);
+        assert_eq!(
+            loaded.samples["claude"]["5h"].used, 42.0,
+            "migrated content should load correctly"
+        );
+    }
+
+    #[test]
+    fn migrate_legacy_new_wins_when_both_exist() {
+        let dir = tempfile::tempdir().unwrap();
+        let old = dir.path().join("quotabar").join("state.json");
+        let new = dir.path().join("manabar").join("state.json");
+        let mut old_store = SampleStore::default();
+        old_store
+            .samples
+            .entry("claude".into())
+            .or_default()
+            .insert(
+                "5h".into(),
+                Sample {
+                    t_ms: 1,
+                    used: 11.0,
+                },
+            );
+        save(&old, &old_store).unwrap();
+        let mut new_store = SampleStore::default();
+        new_store
+            .samples
+            .entry("claude".into())
+            .or_default()
+            .insert(
+                "5h".into(),
+                Sample {
+                    t_ms: 2,
+                    used: 99.0,
+                },
+            );
+        save(&new, &new_store).unwrap();
+
+        migrate_legacy(&old, &new);
+
+        let loaded = load(&new);
+        assert_eq!(
+            loaded.samples["claude"]["5h"].used, 99.0,
+            "existing new-path file must win, not be overwritten by the legacy copy"
+        );
+    }
+
+    #[test]
+    fn migrate_legacy_defaults_when_neither_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let old = dir.path().join("quotabar").join("state.json");
+        let new = dir.path().join("manabar").join("state.json");
+
+        migrate_legacy(&old, &new);
+
+        assert!(
+            !new.exists(),
+            "no migration should happen when old is also missing"
+        );
+        assert_eq!(load(&new), SampleStore::default());
     }
 
     #[test]

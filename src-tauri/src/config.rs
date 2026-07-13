@@ -1,4 +1,4 @@
-use quotabar_core::pricing::{Price, PriceTable};
+use manabar_core::pricing::{Price, PriceTable};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -32,7 +32,7 @@ pub struct PriceOverride {
 }
 
 /// User-facing config shape for health-color thresholds. Deliberately
-/// separate from `quotabar_core::Thresholds`: this one is raw, possibly
+/// separate from `manabar_core::Thresholds`: this one is raw, possibly
 /// invalid, user-editable JSON; `sanitized_thresholds` is the only path
 /// from here to the validated core type.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -85,10 +85,10 @@ impl Default for Config {
 /// other combination (inverted/equal boundaries, negative, or over 100)
 /// falls back to the built-in defaults rather than producing a `Health`
 /// classification that could never show green (or never show red).
-pub fn sanitized_thresholds(cfg: &Config) -> quotabar_core::Thresholds {
+pub fn sanitized_thresholds(cfg: &Config) -> manabar_core::Thresholds {
     let t = cfg.thresholds;
     if (0.0..t.amber).contains(&t.red) && t.amber <= 100.0 {
-        quotabar_core::Thresholds {
+        manabar_core::Thresholds {
             amber: t.amber,
             red: t.red,
         }
@@ -98,15 +98,54 @@ pub fn sanitized_thresholds(cfg: &Config) -> quotabar_core::Thresholds {
             t.amber,
             t.red
         );
-        quotabar_core::Thresholds::default()
+        manabar_core::Thresholds::default()
     }
 }
 
 pub fn config_path() -> PathBuf {
     dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
+        .join("manabar")
+        .join("config.json")
+}
+
+/// Pre-rename (QuotaBar, <= v0.5.x) config location. Read-only: consulted
+/// only by `migrate_legacy`, never written to.
+pub fn legacy_config_path() -> PathBuf {
+    dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
         .join("quotabar")
         .join("config.json")
+}
+
+/// One-way, non-destructive migration run once at startup before `load`: if
+/// `new_path` is missing but `old_path` (the pre-rename QuotaBar location)
+/// exists, copies it to `new_path` so the rename doesn't silently reset
+/// existing settings. The old file is left in place — this is a copy, never
+/// a move. A no-op when `new_path` already exists (the new file always wins
+/// over a stale legacy copy) or when neither exists (the caller's `load`
+/// then falls back to defaults, same as any other missing-file case).
+pub fn migrate_legacy(old_path: &Path, new_path: &Path) {
+    if new_path.exists() || !old_path.exists() {
+        return;
+    }
+    if let Some(parent) = new_path.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            log::warn!("failed to create config dir for migration: {e}");
+            return;
+        }
+    }
+    match std::fs::copy(old_path, new_path) {
+        Ok(_) => log::info!(
+            "migrated config from {} to {}",
+            old_path.display(),
+            new_path.display()
+        ),
+        Err(e) => log::warn!(
+            "failed to migrate legacy config from {}: {e}",
+            old_path.display()
+        ),
+    }
 }
 
 pub fn load(path: &Path) -> Config {
@@ -300,7 +339,7 @@ mod tests {
             ..Config::default()
         };
         let t = sanitized_thresholds(&cfg);
-        assert_eq!(t, quotabar_core::Thresholds::default());
+        assert_eq!(t, manabar_core::Thresholds::default());
     }
 
     #[test]
@@ -313,7 +352,7 @@ mod tests {
             ..Config::default()
         };
         let t = sanitized_thresholds(&cfg);
-        assert_eq!(t, quotabar_core::Thresholds::default());
+        assert_eq!(t, manabar_core::Thresholds::default());
     }
 
     #[test]
@@ -326,7 +365,64 @@ mod tests {
             ..Config::default()
         };
         let t = sanitized_thresholds(&cfg);
-        assert_eq!(t, quotabar_core::Thresholds::default());
+        assert_eq!(t, manabar_core::Thresholds::default());
+    }
+
+    #[test]
+    fn migrate_legacy_copies_when_new_missing_and_old_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let old = dir.path().join("quotabar").join("config.json");
+        let new = dir.path().join("manabar").join("config.json");
+        std::fs::create_dir_all(old.parent().unwrap()).unwrap();
+        std::fs::write(&old, r#"{"poll_interval_secs":42}"#).unwrap();
+
+        migrate_legacy(&old, &new);
+
+        assert!(new.exists(), "new path should exist after migration");
+        assert!(
+            old.exists(),
+            "old path must be left in place (non-destructive)"
+        );
+        let cfg = load(&new);
+        assert_eq!(
+            cfg.poll_interval_secs, 42,
+            "migrated content should load correctly"
+        );
+    }
+
+    #[test]
+    fn migrate_legacy_new_wins_when_both_exist() {
+        let dir = tempfile::tempdir().unwrap();
+        let old = dir.path().join("quotabar").join("config.json");
+        let new = dir.path().join("manabar").join("config.json");
+        std::fs::create_dir_all(old.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(new.parent().unwrap()).unwrap();
+        std::fs::write(&old, r#"{"poll_interval_secs":42}"#).unwrap();
+        std::fs::write(&new, r#"{"poll_interval_secs":99}"#).unwrap();
+
+        migrate_legacy(&old, &new);
+
+        let cfg = load(&new);
+        assert_eq!(
+            cfg.poll_interval_secs, 99,
+            "existing new-path file must win, not be overwritten by the legacy copy"
+        );
+    }
+
+    #[test]
+    fn migrate_legacy_defaults_when_neither_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let old = dir.path().join("quotabar").join("config.json");
+        let new = dir.path().join("manabar").join("config.json");
+
+        migrate_legacy(&old, &new);
+
+        assert!(
+            !new.exists(),
+            "no migration should happen when old is also missing"
+        );
+        let cfg = load(&new);
+        assert_eq!(cfg, Config::default());
     }
 
     #[test]

@@ -24,6 +24,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh release create "$GITHUB_REF_NAME" --title "QuotaBar $GITHUB_REF_NAME" --notes "Automated release." || true
-          cp target/release/quotabar.exe "QuotaBar_${GITHUB_REF_NAME#v}_portable.exe"
-          gh release upload "$GITHUB_REF_NAME" target/release/bundle/nsis/*-setup.exe "QuotaBar_${GITHUB_REF_NAME#v}_portable.exe" --clobber
+          gh release create "$GITHUB_REF_NAME" --title "ManaBar $GITHUB_REF_NAME" --notes "Automated release." || true
+          cp target/release/manabar.exe "ManaBar_${GITHUB_REF_NAME#v}_portable.exe"
+          gh release upload "$GITHUB_REF_NAME" target/release/bundle/nsis/*-setup.exe "ManaBar_${GITHUB_REF_NAME#v}_portable.exe" --clobber

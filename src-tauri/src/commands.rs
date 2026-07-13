@@ -1,4 +1,4 @@
-use quotabar_core::model::ProviderView;
+use manabar_core::model::ProviderView;
 use std::time::{Duration, Instant};
 
 /// Windows `CREATE_NO_WINDOW` flag: suppresses the console window a spawned
@@ -139,7 +139,7 @@ fn run_signin_cli(program: &str, args: &[String]) -> std::io::Result<SigninOutco
 
 /// Spawns the provider's own sign-in CLI once with a fixed, trivial prompt —
 /// exactly the manual remediation a user would perform — then triggers a
-/// quota re-poll on success. QuotaBar never touches credential files
+/// quota re-poll on success. ManaBar never touches credential files
 /// directly; the CLI does its own token refresh as a side effect of running.
 ///
 /// The blocking `std::process::Command` call runs on a `spawn_blocking`

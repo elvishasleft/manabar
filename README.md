@@ -1,4 +1,8 @@
-# QuotaBar
+# ManaBar
+
+Formerly QuotaBar — renamed in v0.6.0; config and state migrate
+automatically from the old `%APPDATA%\quotabar` location, see
+[Configuration](#configuration).
 
 A Windows and macOS tray app that shows, at a glance, how much subscription
 quota you have left on three AI coding assistants — **Claude Code**
@@ -10,7 +14,7 @@ to running out — see [macOS](#macos) below. The macOS build is compiled,
 tested, and smoke-launched on GitHub Actions' Apple-silicon runners on every
 release; final validation on physical Mac hardware is still pending.
 
-![QuotaBar panel](docs/screenshot.png)
+![ManaBar panel](docs/screenshot.png)
 
 No click required to check quota: the tray icon itself is the status
 readout, redrawn after every poll.
@@ -55,39 +59,39 @@ Windows, `Start at Login` on macOS), and `Quit`.
     a bare API key against DeepSeek's own official balance endpoint.
 
   A provider you haven't installed/signed into (or, for DeepSeek, don't
-  have a key for) just shows as unavailable (gray) — QuotaBar doesn't
+  have a key for) just shows as unavailable (gray) — ManaBar doesn't
   require all four.
 
 ## Install
 
 Prebuilt installers are attached to
-[Releases](https://github.com/arteeeezy/quotabar/releases) (repo is
+[Releases](https://github.com/arteeeezy/manabar/releases) (repo is
 private — collaborators only; macOS has a terminal one-liner, see
 [macOS](#macos)). On Windows you can also build from source:
 
 ```bash
-git clone https://github.com/arteeeezy/quotabar.git
-cd quotabar
+git clone https://github.com/arteeeezy/manabar.git
+cd manabar
 npm install
 npm run tauri build
 ```
 
 This produces two bundles under the workspace target directory:
 
-- NSIS installer: `target/release/bundle/nsis/QuotaBar_<version>_x64-setup.exe`
-- MSI installer: `target/release/bundle/msi/QuotaBar_<version>_x64_en-US.msi`
+- NSIS installer: `target/release/bundle/nsis/ManaBar_<version>_x64-setup.exe`
+- MSI installer: `target/release/bundle/msi/ManaBar_<version>_x64_en-US.msi`
 
-Run either one and QuotaBar starts in the tray. The NSIS installer is
+Run either one and ManaBar starts in the tray. The NSIS installer is
 per-user (no admin required, installs under `%LOCALAPPDATA%`); the MSI is
-per-machine (elevation prompt, installs to `C:\Program Files\QuotaBar`).
+per-machine (elevation prompt, installs to `C:\Program Files\ManaBar`).
 To uninstall, use Windows' "Add or remove programs", or run
 the uninstaller next to the installed exe (NSIS default:
-`%LOCALAPPDATA%\QuotaBar\uninstall.exe`).
+`%LOCALAPPDATA%\ManaBar\uninstall.exe`).
 
-**Portable:** no-install option — download `QuotaBar_<version>_portable.exe`
-from [Releases](https://github.com/arteeeezy/quotabar/releases) and run it
+**Portable:** no-install option — download `ManaBar_<version>_portable.exe`
+from [Releases](https://github.com/arteeeezy/manabar/releases) and run it
 directly; there's nothing to install or uninstall. Config still lives in
-`%APPDATA%\quotabar` (same place as the installed builds), so settings
+`%APPDATA%\manabar` (same place as the installed builds), so settings
 carry over if you later switch to an installer build. Because the
 autostart toggle registers the exe's *current* path, re-toggle
 **Start with Windows** after moving the portable exe to wherever it'll
@@ -102,7 +106,7 @@ Note for GNU-toolchain builds: if you compile with
 from the MSI — the NSIS bundle currently omits `WebView2Loader.dll`,
 which GNU builds load dynamically, and the installed app will fail to
 start without it. MSVC builds link it statically and are unaffected.
-The same applies to running `target/release/quotabar.exe` directly on a
+The same applies to running `target/release/manabar.exe` directly on a
 GNU toolchain ("The code execution cannot proceed because
 WebView2Loader.dll was not found"): copy the DLL next to the exe once —
 
@@ -110,7 +114,7 @@ WebView2Loader.dll was not found"): copy the DLL next to the exe once —
 cp target/release/build/webview2-com-sys-*/out/x64/WebView2Loader.dll target/release/
 ```
 
-**Single instance:** QuotaBar only ever runs one copy at a time. Launching
+**Single instance:** ManaBar only ever runs one copy at a time. Launching
 it again — portable exe or installed shortcut — doesn't spawn a second
 tray icon; it just brings the existing instance's panel to the front.
 
@@ -126,20 +130,20 @@ signing/notarization, and the App Store are out of scope for now.
   latest release in one command:
 
   ```bash
-  gh api -H "Accept: application/vnd.github.raw" repos/arteeeezy/quotabar/contents/scripts/install-mac.sh | bash
+  gh api -H "Accept: application/vnd.github.raw" repos/arteeeezy/manabar/contents/scripts/install-mac.sh | bash
   ```
 
   This downloads the latest `.dmg` release asset, replaces
-  `/Applications/QuotaBar.app`, strips the Gatekeeper quarantine
+  `/Applications/ManaBar.app`, strips the Gatekeeper quarantine
   attribute (`xattr -dr com.apple.quarantine`) so there's no
   right-click-Open dance, and launches the app. Re-run the same
   command any time to upgrade to the newest release.
 - **Install (manual, fallback):** download the `.dmg` from
-  [Releases](https://github.com/arteeeezy/quotabar/releases), open it,
-  and drag `QuotaBar.app` into `Applications` (or run it directly from
+  [Releases](https://github.com/arteeeezy/manabar/releases), open it,
+  and drag `ManaBar.app` into `Applications` (or run it directly from
   the mounted volume). The build is unsigned/not notarized, so
   Gatekeeper blocks a plain double-click the first time —
-  **right-click `QuotaBar.app` → Open**, then confirm in the dialog
+  **right-click `ManaBar.app` → Open**, then confirm in the dialog
   (or, if that dialog doesn't appear, allow it via **System
   Settings → Privacy & Security → "Open Anyway"**). This is only needed
   once; subsequent launches (including autostart) work normally.
@@ -156,7 +160,7 @@ signing/notarization, and the App Store are out of scope for now.
 - **Claude credentials via Keychain:** some Claude Code installs on macOS
   store the OAuth token in the login Keychain (service
   `Claude Code-credentials`) instead of the plaintext
-  `~/.claude/.credentials.json` file used elsewhere. QuotaBar checks the
+  `~/.claude/.credentials.json` file used elsewhere. ManaBar checks the
   file first and only falls back to reading the Keychain entry (via the
   `security` CLI, read-only, same as the file path) when the file doesn't
   exist — no extra unlock step should be needed beyond your normal login
@@ -168,13 +172,19 @@ signing/notarization, and the App Store are out of scope for now.
 
 ## Configuration
 
-QuotaBar reads `%APPDATA%\quotabar\config.json` once at startup (on macOS:
-`~/Library/Application Support/quotabar/config.json`) — created with
+ManaBar reads `%APPDATA%\manabar\config.json` once at startup (on macOS:
+`~/Library/Application Support/manabar/config.json`) — created with
 defaults on first run if missing; invalid JSON falls back to defaults
 rather than crashing. There is no in-app settings UI in v1 — edit the
-file and restart QuotaBar for changes (including `poll_interval_secs`) to
+file and restart ManaBar for changes (including `poll_interval_secs`) to
 take effect. `Refresh now` does not reload config; it only triggers an
 immediate extra poll using the interval already in memory.
+
+**Upgrading from QuotaBar:** on first launch after the v0.6.0 rename, if
+`%APPDATA%\manabar\config.json` (and `state.json`) don't exist yet but the
+old `%APPDATA%\quotabar\` versions do, they're copied over automatically —
+one-way and non-destructive, the old files are left in place untouched.
+No action needed; this happens transparently on startup.
 
 ```json
 {
@@ -206,7 +216,7 @@ immediate extra poll using the interval already in memory.
 
 | Field | Type | Default | Meaning |
 |---|---|---|---|
-| `poll_interval_secs` | number | `1800` | Seconds between quota-endpoint polls. `0` enables **on-demand mode**: no periodic background polling — QuotaBar polls once at startup (so the tray has a baseline), then refreshes only when the panel is opened or tray `Refresh now` is clicked; tray levels stay at their last-known value between opens. Values 1-59 are clamped to 60. Opening the panel triggers an immediate usage refresh plus a quota poll; tray `Refresh now` triggers an immediate quota poll. |
+| `poll_interval_secs` | number | `1800` | Seconds between quota-endpoint polls. `0` enables **on-demand mode**: no periodic background polling — ManaBar polls once at startup (so the tray has a baseline), then refreshes only when the panel is opened or tray `Refresh now` is clicked; tray levels stay at their last-known value between opens. Values 1-59 are clamped to 60. Opening the panel triggers an immediate usage refresh plus a quota poll; tray `Refresh now` triggers an immediate quota poll. |
 | `enabled.claude` / `enabled.codex` / `enabled.grok` / `enabled.deepseek` | bool | `true` | Set to `false` to fully hide that provider: no tray bar (the icon narrows and re-centers around the remaining bars) and no panel card. Polling for it stops entirely — this isn't a display-only toggle. |
 | `price_overrides` | array | `[]` | Per-model USD price overrides (per million tokens: `input`, `output`, `cache_read`, `cache_write`). `model_contains` is a substring match checked before the built-in price table, first match wins. |
 | `thresholds.amber` / `thresholds.red` | number | `30.0` / `10.0` | Health-color boundaries, as a remaining-percent cutoff: green above `amber`, amber above `red`, red at or below `red`. Must satisfy `0.0 ≤ red < amber ≤ 100.0` — an invalid combination (inverted/equal, negative, or over 100) is logged as a warning and the built-in 30/10 defaults are used instead for that run. |
@@ -216,7 +226,7 @@ immediate extra poll using the interval already in memory.
 
 ## How it works
 
-QuotaBar never asks you to sign in. It reads the credential files your
+ManaBar never asks you to sign in. It reads the credential files your
 CLIs already maintain (read-only, never written or refreshed) and calls
 the same unofficial usage endpoints those CLIs use internally:
 
@@ -232,7 +242,7 @@ reverse-engineered from the CLIs' own network traffic, not documented
 or supported by Anthropic, OpenAI, or xAI. DeepSeek's `/user/balance`
 is the exception: it's official and documented. The unofficial
 endpoints can change or be gated at any time without notice. When that
-happens, QuotaBar doesn't guess: a response that returns `2xx` but no
+happens, ManaBar doesn't guess: a response that returns `2xx` but no
 longer parses puts that provider into a distinct `SchemaChanged` state,
 shown in the tray as gray and in the panel as "Endpoint changed —
 needs an update," rather than showing a silently wrong number. Other
@@ -249,7 +259,7 @@ padded out to match a paid plan's shape.
 
 The panel's cumulative cost numbers are **estimates**: token counts
 parsed from each CLI's own local session logs, multiplied by a static
-per-model price table (`crates/quotabar-core/src/pricing.rs`),
+per-model price table (`crates/manabar-core/src/pricing.rs`),
 overridable via `price_overrides` in the config. They are not billing
 data and won't exactly match your provider invoice. Grok's usage is
 credits-based rather than token-priced, so its panel shows token counts
@@ -271,11 +281,11 @@ the panel twice; the same applies after a data gap longer than 48 hours,
 which is treated as stale rather than extrapolated from.
 
 The last two samples per provider+window are persisted to
-`%APPDATA%\quotabar\state.json` (next to `config.json`, but shell-managed —
+`%APPDATA%\manabar\state.json` (next to `config.json`, but shell-managed —
 not meant to be hand-edited) so the estimate survives app restarts instead
 of resetting to nothing every launch.
 
-QuotaBar also sends a Windows notification the moment a provider's health
+ManaBar also sends a Windows notification the moment a provider's health
 *worsens* into amber or red (not on every poll while it stays amber/red, and
 not on improvement) — e.g. `Claude: 28% left (5h), runs out ~14:32`. Like
 everything else, this only fires when a poll actually happens: in on-demand
@@ -286,14 +296,14 @@ background polling to enable notifications between those events.
 
 ```bash
 npm install                 # frontend deps
-cargo test --workspace      # unit + integration tests (quotabar-core + src-tauri)
+cargo test --workspace      # unit + integration tests (manabar-core + src-tauri)
 cargo fmt --check           # formatting
 cargo clippy --workspace --all-targets -- -D warnings
 npm run tauri dev           # run the app locally
 npm run tauri build         # release build + NSIS/MSI installers
 ```
 
-`quotabar-core` is a plain Rust library crate (no Tauri dependency), so
+`manabar-core` is a plain Rust library crate (no Tauri dependency), so
 its provider parsers and quota/usage math are unit-testable without a
 GUI. Provider integration tests use `wiremock` fixtures for the happy
 path, 401, timeout, and malformed-JSON cases.
