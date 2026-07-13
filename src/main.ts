@@ -134,33 +134,62 @@ function dayTooltip(d: DayUsage): string {
   return `${fmtDayLabel(d.date)} · ${fmtTokens(d.input_tokens)} in · ${fmtTokens(d.output_tokens)} out · ${fmtCost(d.est_cost_usd)}`;
 }
 
-// 7-day usage bar chart: bar height is proportional to (input + output)
-// tokens normalized against the week's max. All bars use the provider's
-// identity accent at reduced opacity except the last (today), which is
-// full opacity. A zero-usage day still renders a thin 1px stub in the
-// track color so the day isn't silently missing from the row. Each bar
-// carries a native <title> tooltip for hover detail.
+// 7-day usage capsule chart: bar height is proportional to (input + output)
+// tokens normalized against the week's max, rendered as pill-shaped
+// capsules (rx = min(barW/2, barH/2), so short bars read as coins and tall
+// bars read as full stadiums). All bars use the provider's identity accent
+// at a fixed opacity ladder — 0.45 for a normal day, 0.15 for a zero-usage
+// day's 4px stub, 1.0 for today (always the last slot) — so today reads as
+// the visual anchor of the row without needing a different hue. Today also
+// gets a small value label (fmtTokens of its input+output total) in a fixed
+// headroom row above the tallest possible bar, so it never collides with
+// any day's capsule regardless of which day is actually tallest. Each bar
+// still carries a native <title> tooltip for hover detail, and weekday
+// initials sit in their own row below the baseline.
 function usageChart(days: DayUsage[], kind: View["kind"]): string {
   const width = 316;
-  const height = 44;
-  const baseline = 30;
-  const maxBarH = 26;
+  const height = 74;
+  const baseline = 54;
+  const maxBarH = 40;
+  const minBarH = 8;
+  const zeroBarH = 4;
   const totals = days.map((d) => d.input_tokens + d.output_tokens);
   const weekMax = Math.max(...totals, 1);
   const n = days.length;
   const slot = width / n;
-  const barW = slot * 0.42;
+  // ~16px at the standard 7-slot/316-wide layout; clamped so a different
+  // day count (not expected in practice, but kept generic) can't overlap
+  // neighboring slots.
+  const barW = Math.min(16, slot - 6);
 
   const bars = days
     .map((d, i) => {
       const total = totals[i];
-      const barH = total > 0 ? Math.max(2, (total / weekMax) * maxBarH) : 1;
+      const isZero = total === 0;
+      const isToday = i === n - 1;
+      const barH = isZero ? zeroBarH : Math.max(minBarH, (total / weekMax) * maxBarH);
+      const rx = Math.min(barW / 2, barH / 2);
       const x = i * slot + (slot - barW) / 2;
       const y = baseline - barH;
-      const isToday = i === n - 1;
-      const barClass = total === 0 ? "chart-bar chart-bar-zero" : isToday ? "chart-bar chart-bar-today" : "chart-bar";
+      const cx = x + barW / 2;
+      const barClass = isToday
+        ? "chart-bar chart-bar-today"
+        : isZero
+          ? "chart-bar chart-bar-zero"
+          : "chart-bar";
       const dayClass = isToday ? "chart-day chart-day-today" : "chart-day";
-      return `<g><title>${dayTooltip(d)}</title><rect class="${barClass}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="1.5"></rect><text class="${dayClass}" x="${(x + barW / 2).toFixed(1)}" y="41">${weekdayInitial(d.date)}</text></g>`;
+      // Today's value label is horizontally centered on its capsule by
+      // default; if that would push the label past the viewBox's right
+      // edge, it anchors to the right edge instead of centering.
+      const label = isToday
+        ? (() => {
+            const anchorEnd = cx > width - 18;
+            const labelX = anchorEnd ? width - 2 : cx;
+            const anchor = anchorEnd ? "end" : "middle";
+            return `<text class="chart-value" x="${labelX.toFixed(1)}" y="8" text-anchor="${anchor}">${fmtTokens(total)}</text>`;
+          })()
+        : "";
+      return `<g><title>${dayTooltip(d)}</title><rect class="${barClass}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="${rx.toFixed(1)}"></rect>${label}<text class="${dayClass}" x="${cx.toFixed(1)}" y="${baseline + 12}">${weekdayInitial(d.date)}</text></g>`;
     })
     .join("");
 
