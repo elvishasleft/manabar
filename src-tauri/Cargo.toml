@@ -1,6 +1,6 @@
 [package]
 name = "manabar"
-version = "0.5.0"
+version = "0.6.0"
 description = "Tray monitor for Claude Code, Codex, and Grok usage quotas"
 authors = ["arteeeezy"]
 edition = "2021"
