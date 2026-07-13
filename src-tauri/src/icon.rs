@@ -1,4 +1,4 @@
-use quotabar_core::Health;
+use manabar_core::Health;
 
 pub const ICON_SIZE: u32 = 32;
 

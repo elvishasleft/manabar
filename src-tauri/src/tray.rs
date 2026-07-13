@@ -1,4 +1,4 @@
-use quotabar_core::model::{Health, ProviderKind, ProviderView};
+use manabar_core::model::{Health, ProviderKind, ProviderView};
 use tauri::image::Image;
 use tauri::menu::{CheckMenuItem, MenuBuilder, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -227,7 +227,7 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
             crate::icon::ICON_SIZE,
             crate::icon::ICON_SIZE,
         ))
-        .tooltip("QuotaBar — starting…")
+        .tooltip("ManaBar — starting…")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
@@ -263,7 +263,7 @@ pub fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use quotabar_core::providers::initial_view;
+    use manabar_core::providers::initial_view;
 
     #[test]
     fn tooltip_shows_percent_or_dash() {

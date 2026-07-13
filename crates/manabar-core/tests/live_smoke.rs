@@ -1,5 +1,5 @@
-use quotabar_core::http::client;
-use quotabar_core::providers::{
+use manabar_core::http::client;
+use manabar_core::providers::{
     claude::ClaudeProvider, codex::CodexProvider, deepseek::DeepSeekProvider, grok::GrokProvider,
 };
 use std::path::PathBuf;

@@ -36,16 +36,16 @@ jobs:
       - name: Launch smoke test
         run: |
           set -e
-          open target/release/bundle/macos/QuotaBar.app
+          open target/release/bundle/macos/ManaBar.app
           sleep 15
-          pgrep -x quotabar || pgrep -f QuotaBar
+          pgrep -x manabar || pgrep -f ManaBar
           screencapture -x /tmp/mac-smoke.png
-          pkill -f QuotaBar || true
+          pkill -f ManaBar || true
 
       - name: Upload .dmg artifact
         uses: actions/upload-artifact@v4
         with:
-          name: quotabar-dmg
+          name: manabar-dmg
           path: target/release/bundle/dmg/*.dmg
 
       - name: Upload launch smoke screenshot
@@ -59,5 +59,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --title "QuotaBar $GITHUB_REF_NAME" --notes "Automated release. macOS: terminal install via scripts/install-mac.sh (see README). Unsigned builds." || true
+          gh release create "$GITHUB_REF_NAME" --title "ManaBar $GITHUB_REF_NAME" --notes "Automated release. macOS: terminal install via scripts/install-mac.sh (see README). Unsigned builds." || true
           gh release upload "$GITHUB_REF_NAME" target/release/bundle/dmg/*.dmg --clobber

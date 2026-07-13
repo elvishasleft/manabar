@@ -343,8 +343,8 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[test]
     fn keychain_roundtrip() {
-        const ACCOUNT: &str = "quotabar-test";
-        const SERVICE: &str = "quotabar-test-svc";
+        const ACCOUNT: &str = "manabar-test";
+        const SERVICE: &str = "manabar-test-svc";
         let synthetic = r#"{"claudeAiOauth":{"accessToken":"tok-keychain","expiresAt":1783753082456,"subscriptionType":"max"}}"#;
 
         let add = std::process::Command::new("security")

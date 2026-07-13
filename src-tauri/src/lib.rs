@@ -5,11 +5,11 @@ mod state;
 mod tray;
 
 use chrono::{DateTime, Utc};
-use quotabar_core::model::{Health, ProviderKind, ProviderView, RateWindow};
-use quotabar_core::pricing::PriceTable;
-use quotabar_core::providers::{default_providers, initial_view, update_view, QuotaProvider};
-use quotabar_core::usage_logs::LogCache;
-use quotabar_core::{exhaust_eta, http};
+use manabar_core::model::{Health, ProviderKind, ProviderView, RateWindow};
+use manabar_core::pricing::PriceTable;
+use manabar_core::providers::{default_providers, initial_view, update_view, QuotaProvider};
+use manabar_core::usage_logs::LogCache;
+use manabar_core::{exhaust_eta, http};
 use std::collections::HashMap;
 use std::time::Duration;
 use tauri::{Emitter, Manager};
@@ -20,7 +20,7 @@ pub struct AppShared {
     http: reqwest::Client,
     cfg: config::Config,
     prices: PriceTable,
-    thresholds: quotabar_core::Thresholds,
+    thresholds: manabar_core::Thresholds,
     log_cache: tokio::sync::Mutex<LogCache>,
     refresh: tokio::sync::Notify,
     sample_store: tokio::sync::Mutex<state::SampleStore>,
@@ -317,7 +317,7 @@ async fn notify_health_transitions(
                 if let Err(e) = app
                     .notification()
                     .builder()
-                    .title("QuotaBar")
+                    .title("ManaBar")
                     .body(body)
                     .show()
                 {
@@ -368,7 +368,7 @@ pub fn run() {
             tauri_plugin_log::Builder::new()
                 .target(tauri_plugin_log::Target::new(
                     tauri_plugin_log::TargetKind::LogDir {
-                        file_name: Some("quotabar".into()),
+                        file_name: Some("manabar".into()),
                     },
                 ))
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepOne)
@@ -389,6 +389,7 @@ pub fn run() {
         ])
         .setup(|app| {
             let cfg_path = config::config_path();
+            config::migrate_legacy(&config::legacy_config_path(), &cfg_path);
             let cfg = config::load(&cfg_path);
             if !cfg_path.exists() {
                 if let Err(e) = config::save(&cfg_path, &cfg) {
@@ -397,7 +398,9 @@ pub fn run() {
             }
             let home = dirs::home_dir().expect("home dir must exist");
             let interval = effective_poll_interval(cfg.poll_interval_secs);
-            let sample_store = state::load(&state::state_path());
+            let state_path = state::state_path();
+            state::migrate_legacy(&state::legacy_state_path(), &state_path);
+            let sample_store = state::load(&state_path);
             app.manage(AppShared::new(cfg, home, sample_store));
             tray::create_tray(app.handle())?;
             let handle = app.handle().clone();
@@ -590,7 +593,7 @@ mod tests {
         let mut view = initial_view(ProviderKind::Claude);
         view.remaining_percent = Some(28.0);
         let eta = Utc.with_ymd_and_hms(2026, 7, 12, 14, 32, 0).unwrap();
-        view.quota = Some(quotabar_core::model::QuotaSnapshot {
+        view.quota = Some(manabar_core::model::QuotaSnapshot {
             plan: None,
             windows: vec![window("5h", 72.0, None)]
                 .into_iter()
@@ -610,7 +613,7 @@ mod tests {
     fn notification_body_omits_eta_part_when_absent() {
         let mut view = initial_view(ProviderKind::Codex);
         view.remaining_percent = Some(5.0);
-        view.quota = Some(quotabar_core::model::QuotaSnapshot {
+        view.quota = Some(manabar_core::model::QuotaSnapshot {
             plan: None,
             windows: vec![window("30d", 95.0, None)],
             fetched_at: Utc::now(),

@@ -31,4 +31,4 @@ jobs:
           components: llvm-tools-preview
       - uses: taiki-e/install-action@cargo-llvm-cov
       - uses: Swatinem/rust-cache@v2
-      - run: cargo llvm-cov -p quotabar-core --fail-under-lines 80
+      - run: cargo llvm-cov -p manabar-core --fail-under-lines 80

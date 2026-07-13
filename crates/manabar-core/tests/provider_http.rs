@@ -1,5 +1,5 @@
-use quotabar_core::http::{client, get_json};
-use quotabar_core::model::ProviderError;
+use manabar_core::http::{client, get_json};
+use manabar_core::model::ProviderError;
 use wiremock::matchers::{header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -44,7 +44,7 @@ async fn get_json_maps_connect_failure_to_network() {
     assert!(matches!(err, ProviderError::Network(_)));
 }
 
-use quotabar_core::providers::claude::ClaudeProvider;
+use manabar_core::providers::claude::ClaudeProvider;
 use std::fs;
 
 fn fake_home_with_claude_creds(expires_in_mins: i64) -> tempfile::TempDir {
@@ -134,7 +134,7 @@ async fn claude_malformed_body_is_schema_changed() {
     ));
 }
 
-use quotabar_core::providers::codex::CodexProvider;
+use manabar_core::providers::codex::CodexProvider;
 
 fn fake_home_with_codex_creds() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
@@ -186,7 +186,7 @@ async fn codex_401_maps_to_token_expired() {
     ));
 }
 
-use quotabar_core::providers::grok::GrokProvider;
+use manabar_core::providers::grok::GrokProvider;
 
 fn fake_home_with_grok_creds() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
@@ -272,7 +272,7 @@ async fn grok_401_maps_to_token_expired() {
     ));
 }
 
-use quotabar_core::providers::deepseek::DeepSeekProvider;
+use manabar_core::providers::deepseek::DeepSeekProvider;
 
 #[tokio::test]
 async fn deepseek_fetch_happy_path() {
