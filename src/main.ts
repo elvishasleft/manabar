@@ -99,14 +99,72 @@ function errorCopy(v: View): string {
   }
 }
 
-function sparkline(days: DayUsage[]): string {
-  const vals = days.map((d) => d.input_tokens + d.output_tokens);
-  const max = Math.max(...vals, 1);
-  const denom = Math.max(vals.length - 1, 1);
-  const pts = vals
-    .map((v, i) => `${(i / denom) * 100},${18 - (v / max) * 16}`)
-    .join(" ");
-  return `<svg class="spark" viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" fill="none" /></svg>`;
+const WEEKDAY_INITIALS = ["S", "M", "T", "W", "T", "F", "S"];
+const SHORT_MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+// Backend day labels are plain "YYYY-MM-DD" local-day strings (see
+// DayUsage.date) — split explicitly and built via Date.UTC rather than
+// `new Date(str)` so weekday/label derivation can't shift across midnight
+// depending on the host machine's timezone offset.
+function parseDayUsage(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
+function weekdayInitial(dateStr: string): string {
+  return WEEKDAY_INITIALS[parseDayUsage(dateStr).getUTCDay()];
+}
+
+function fmtDayLabel(dateStr: string): string {
+  const d = parseDayUsage(dateStr);
+  return `${SHORT_MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+}
+
+function fmtCost(usd: number | null): string {
+  return usd != null ? `$${usd.toFixed(2)} est.` : "—";
+}
+
+// "Jul 10 · 187.9M in · 145.5K out · $88.45 est." — every part is a number
+// or date reformatted from backend fields, so (like etaLabel above) no
+// esc() is needed: no raw API strings ever reach this string.
+function dayTooltip(d: DayUsage): string {
+  return `${fmtDayLabel(d.date)} · ${fmtTokens(d.input_tokens)} in · ${fmtTokens(d.output_tokens)} out · ${fmtCost(d.est_cost_usd)}`;
+}
+
+// 7-day usage bar chart: bar height is proportional to (input + output)
+// tokens normalized against the week's max. All bars use the provider's
+// identity accent at reduced opacity except the last (today), which is
+// full opacity. A zero-usage day still renders a thin 1px stub in the
+// track color so the day isn't silently missing from the row. Each bar
+// carries a native <title> tooltip for hover detail.
+function usageChart(days: DayUsage[], kind: View["kind"]): string {
+  const width = 316;
+  const height = 44;
+  const baseline = 30;
+  const maxBarH = 26;
+  const totals = days.map((d) => d.input_tokens + d.output_tokens);
+  const weekMax = Math.max(...totals, 1);
+  const n = days.length;
+  const slot = width / n;
+  const barW = slot * 0.42;
+
+  const bars = days
+    .map((d, i) => {
+      const total = totals[i];
+      const barH = total > 0 ? Math.max(2, (total / weekMax) * maxBarH) : 1;
+      const x = i * slot + (slot - barW) / 2;
+      const y = baseline - barH;
+      const isToday = i === n - 1;
+      const barClass = total === 0 ? "chart-bar chart-bar-zero" : isToday ? "chart-bar chart-bar-today" : "chart-bar";
+      const dayClass = isToday ? "chart-day chart-day-today" : "chart-day";
+      return `<g><title>${dayTooltip(d)}</title><rect class="${barClass}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="1.5"></rect><text class="${dayClass}" x="${(x + barW / 2).toFixed(1)}" y="41">${weekdayInitial(d.date)}</text></g>`;
+    })
+    .join("");
+
+  return `<svg class="chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${NAMES[kind]} 7-day usage">${bars}</svg>`;
 }
 
 // Ring gauge: a small donut showing the provider's binding remaining-percent.
@@ -185,12 +243,11 @@ function card(v: View): string {
     ? `<div class="win-line win-error"><span class="err-icon" aria-hidden="true">⚠</span>${esc(errorCopy(v))}</div>${refreshButtonHtml(v)}`
     : (v.quota?.windows ?? []).map(windowLine).join("");
   const today = v.usage?.days.at(-1);
-  const cost = today?.est_cost_usd != null ? `$${today.est_cost_usd.toFixed(2)} est.` : "—";
   const bottomRow =
     v.usage && today
       ? `<div class="card-bottom">
-           <span class="usage-line">Today ${fmtTokens(today.input_tokens)} in · ${fmtTokens(today.output_tokens)} out · ${cost}</span>
-           ${sparkline(v.usage.days)}
+           <span class="usage-line">Today ${fmtTokens(today.input_tokens)} in · ${fmtTokens(today.output_tokens)} out · ${fmtCost(today.est_cost_usd)}</span>
+           ${usageChart(v.usage.days, v.kind)}
          </div>`
       : "";
   const plan = v.quota?.plan ? `<span class="plan">${esc(v.quota.plan)}</span>` : "";
