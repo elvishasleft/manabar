@@ -22,11 +22,56 @@ struct ConfigRaw {
     current_period: Option<PeriodRaw>,
     on_demand_cap: Option<ValRaw>,
     on_demand_used: Option<ValRaw>,
+    monthly_limit: Option<ValRaw>,
+    used: Option<ValRaw>,
+    billing_period_end: Option<String>,
 }
 
 #[derive(Deserialize)]
 struct BillingRaw {
     config: Option<ConfigRaw>,
+}
+
+fn parse_rfc3339(s: &str) -> Option<DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(s)
+        .ok()
+        .map(|d| d.with_timezone(&Utc))
+}
+
+// xAI has shipped two shapes for /v1/billing: a weekly `creditUsagePercent`
+// (pre-2026-07) and a unified-billing monthly credit pool (`monthlyLimit` +
+// `used`). Accept both so a server-side rollback doesn't break the gauge.
+fn primary_window(config: &ConfigRaw) -> Result<RateWindow, ProviderError> {
+    if let Some(used) = config.credit_usage_percent {
+        let resets_at = config
+            .current_period
+            .as_ref()
+            .and_then(|p| p.end.as_deref())
+            .and_then(parse_rfc3339);
+        return Ok(RateWindow {
+            label: "Weekly credits".into(),
+            used_percent: used,
+            resets_at,
+            exhaust_eta: None,
+        });
+    }
+    let limit = config
+        .monthly_limit
+        .as_ref()
+        .and_then(|v| v.val)
+        .unwrap_or(0.0);
+    if limit > 0.0 {
+        let used = config.used.as_ref().and_then(|v| v.val).unwrap_or(0.0);
+        return Ok(RateWindow {
+            label: "Monthly credits".into(),
+            used_percent: (used / limit) * 100.0,
+            resets_at: config.billing_period_end.as_deref().and_then(parse_rfc3339),
+            exhaust_eta: None,
+        });
+    }
+    Err(ProviderError::SchemaChanged(
+        "grok billing: neither creditUsagePercent nor monthlyLimit present".into(),
+    ))
 }
 
 pub fn parse_billing(
@@ -39,23 +84,18 @@ pub fn parse_billing(
     let config = raw
         .config
         .ok_or_else(|| ProviderError::SchemaChanged("grok billing: missing config".into()))?;
-    let used = config.credit_usage_percent.ok_or_else(|| {
-        ProviderError::SchemaChanged("grok billing: missing creditUsagePercent".into())
-    })?;
-    let resets_at = config
-        .current_period
-        .and_then(|p| p.end)
-        .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
-        .map(|d| d.with_timezone(&Utc));
-    let mut windows = vec![RateWindow {
-        label: "Weekly credits".into(),
-        used_percent: used,
-        resets_at,
-        exhaust_eta: None,
-    }];
-    let cap = config.on_demand_cap.and_then(|v| v.val).unwrap_or(0.0);
+    let mut windows = vec![primary_window(&config)?];
+    let cap = config
+        .on_demand_cap
+        .as_ref()
+        .and_then(|v| v.val)
+        .unwrap_or(0.0);
     if cap > 0.0 {
-        let od_used = config.on_demand_used.and_then(|v| v.val).unwrap_or(0.0);
+        let od_used = config
+            .on_demand_used
+            .as_ref()
+            .and_then(|v| v.val)
+            .unwrap_or(0.0);
         windows.push(RateWindow {
             label: "On-demand".into(),
             used_percent: (od_used / cap) * 100.0,
@@ -106,12 +146,11 @@ impl GrokProvider {
                 }),
             _ => None,
         };
-        let (status, body) = get_json(
-            http,
-            &format!("{}/v1/billing?format=credits", self.base_url),
-            &auth,
-        )
-        .await?;
+        // Unified billing (2026-07) returns the credit pool on the bare
+        // /v1/billing route; the old ?format=credits variant no longer
+        // carries usage fields.
+        let (status, body) =
+            get_json(http, &format!("{}/v1/billing", self.base_url), &auth).await?;
         match status {
             200 => parse_billing(&body, plan, now),
             401 | 403 => Err(ProviderError::TokenExpired),
@@ -127,6 +166,17 @@ mod tests {
     use chrono::Utc;
 
     const FIXTURE: &str = include_str!("../../tests/fixtures/grok_billing.json");
+    const FIXTURE_MONTHLY: &str = include_str!("../../tests/fixtures/grok_billing_monthly.json");
+
+    #[test]
+    fn parses_monthly_unified_billing_shape() {
+        let snap = parse_billing(FIXTURE_MONTHLY, Some("X Premium+".into()), Utc::now()).unwrap();
+        assert_eq!(snap.plan.as_deref(), Some("X Premium+"));
+        assert_eq!(snap.windows.len(), 1);
+        assert_eq!(snap.windows[0].label, "Monthly credits");
+        assert_eq!(snap.windows[0].used_percent, 25.0);
+        assert!(snap.windows[0].resets_at.is_some());
+    }
 
     #[test]
     fn parses_real_billing_shape() {
