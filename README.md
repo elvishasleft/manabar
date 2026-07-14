@@ -1,3 +1,13 @@
+<div align="center">
+
+![ManaBar — one tray icon for every AI quota](docs/assets/hero.svg)
+
+[![CI](https://github.com/arteeeezy/manabar/actions/workflows/ci.yml/badge.svg)](https://github.com/arteeeezy/manabar/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/arteeeezy/manabar)](https://github.com/arteeeezy/manabar/releases)
+
+</div>
+
 # ManaBar
 
 Formerly QuotaBar — renamed in v0.6.0; config and state migrate
@@ -14,12 +24,16 @@ to running out — see [macOS](#macos) below. The macOS build is compiled,
 tested, and smoke-launched on GitHub Actions' Apple-silicon runners on every
 release; final validation on physical Mac hardware is still pending.
 
-![ManaBar panel](docs/screenshot.png)
+<div align="center">
+  <img src="docs/assets/panel.svg" width="380" alt="ManaBar panel: four provider cards with ring gauges, rate windows, burn-rate ETAs, and 7-day usage charts">
+</div>
 
 No click required to check quota: the tray icon itself is the status
 readout, redrawn after every poll.
 
 ## Tray icon legend
+
+![ManaBar in the Windows system tray, with the hover tooltip](docs/assets/tray.svg)
 
 The icon is one vertical bar per **enabled** provider, always in this
 relative order: **Claude, Codex, Grok, DeepSeek**. A provider disabled via
@@ -65,9 +79,10 @@ Windows, `Start at Login` on macOS), and `Quit`.
 ## Install
 
 Prebuilt installers are attached to
-[Releases](https://github.com/arteeeezy/manabar/releases) (repo is
-private — collaborators only; macOS has a terminal one-liner, see
-[macOS](#macos)). On Windows you can also build from source:
+[Releases](https://github.com/arteeeezy/manabar/releases) — a Windows
+NSIS setup, a portable single-file exe, and a macOS `.dmg` with a
+terminal one-liner installer (see [macOS](#macos)). On Windows you can
+also build from source:
 
 ```bash
 git clone https://github.com/arteeeezy/manabar.git
@@ -120,17 +135,16 @@ tray icon; it just brings the existing instance's panel to the front.
 
 ## macOS
 
+![ManaBar in the macOS menu bar: bars icon plus binding-provider letter and percent](docs/assets/menubar.svg)
+
 macOS support targets Apple Silicon (arm64) only; Intel (x86_64), code
 signing/notarization, and the App Store are out of scope for now.
 
-- **Install / upgrade (terminal, recommended):** one-time setup —
-  `brew install gh && gh auth login` (this repo is private, so `gh`
-  needs to be authenticated as a collaborator; the script below reads
-  through that same `gh` session). Then, to install or upgrade to the
-  latest release in one command:
+- **Install / upgrade (terminal, recommended):** no prerequisites —
+  install or upgrade to the latest release in one command:
 
   ```bash
-  gh api -H "Accept: application/vnd.github.raw" repos/arteeeezy/manabar/contents/scripts/install-mac.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/arteeeezy/manabar/main/scripts/install-mac.sh | bash
   ```
 
   This downloads the latest `.dmg` release asset, replaces
@@ -235,7 +249,7 @@ the same unofficial usage endpoints those CLIs use internally:
 | Claude Code | `%USERPROFILE%\.claude\.credentials.json` (macOS: falls back to the login Keychain entry `Claude Code-credentials` when that file doesn't exist — see [macOS](#macos)) | `GET https://api.anthropic.com/api/oauth/usage` (Bearer token + `anthropic-beta: oauth-2025-04-20`) — primary: `limits[]` array (`session` / `weekly_all` / `weekly_scoped`, the latter carrying a per-model `scope.model.display_name` weekly window); fallback: legacy `five_hour`, `seven_day`, `seven_day_sonnet`, `seven_day_opus`, `extra_usage`; plan from `subscriptionType` | `%USERPROFILE%\.claude\projects\**\*.jsonl` |
 | Codex CLI | `%USERPROFILE%\.codex\auth.json`, or `$CODEX_HOME\auth.json` when the `CODEX_HOME` environment variable is set | `GET https://chatgpt.com/backend-api/wham/usage` (Bearer token) — `rate_limit.primary_window` (5h), `secondary_window` (weekly), `additional_rate_limits[]` (per-model, paid plans) | `%USERPROFILE%\.codex\sessions\**\*.jsonl` |
 | Grok CLI | `%USERPROFILE%\.grok\auth.json` (keyed by `issuer::client_id`, token field `key`) | `GET https://cli-chat-proxy.grok.com/v1/billing?format=credits` (`config.creditUsagePercent`, `currentPeriod.end`) + `GET .../v1/settings` (plan label) | `%USERPROFILE%\.grok\sessions\**\signals.json` (`contextTokensUsed`, `primaryModelId`) |
-| DeepSeek | `DEEPSEEK_API_KEY` environment variable, or `deepseek_api_key` in config | `GET https://api.deepseek.com/user/balance` (Bearer token) — **the one official, documented endpoint of the four**; `balance_infos[0].total_balance` (a string) becomes the `Balance` window and the plan pill (e.g. `¥97.97`) | none — DeepSeek's card has no usage/sparkline block (`usage: null`); driven internally by omp, out of scope |
+| DeepSeek | `DEEPSEEK_API_KEY` environment variable, or `deepseek_api_key` in config | `GET https://api.deepseek.com/user/balance` (Bearer token) — **the one official, documented endpoint of the four**; `balance_infos[0].total_balance` (a string) becomes the `Balance` window and the plan pill (e.g. `¥42.50`) | none — DeepSeek's card has no usage/sparkline block (`usage: null`); driven internally by omp, out of scope |
 
 Claude, Codex, and Grok's endpoints are **unofficial** —
 reverse-engineered from the CLIs' own network traffic, not documented

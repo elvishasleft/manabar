@@ -1,0 +1,141 @@
+<svg viewBox="0 0 380 860" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ManaBar panel — four provider cards with ring gauges and 7-day usage charts" font-family="'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif">
+  <rect x="0" y="0" width="380" height="860" rx="10" fill="#0b0b0e"/>
+
+  <!-- ============================== Claude ============================== -->
+  <g>
+    <rect x="14" y="14" width="352" height="196" rx="12" fill="#101014" stroke="rgba(255,255,255,0.07)"/>
+    <!-- ring: 62% green -->
+    <circle cx="58" cy="56" r="25.5" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="5"/>
+    <circle cx="58" cy="56" r="25.5" fill="none" stroke="#97c459" stroke-width="5" stroke-linecap="round"
+            stroke-dasharray="99.3 160.2" transform="rotate(-90 58 56)"/>
+    <text x="58" y="62" font-size="17" font-weight="600" fill="#ececf0" text-anchor="middle">62</text>
+    <!-- identity -->
+    <circle cx="104" cy="39" r="3.5" fill="#cc7a5c"/>
+    <text x="114" y="44" font-size="14.5" font-weight="600" fill="#ececf0">Claude</text>
+    <rect x="172" y="31" width="36" height="17" rx="8.5" fill="none" stroke="rgba(255,255,255,0.15)"/>
+    <text x="190" y="43" font-size="9.5" font-weight="600" letter-spacing="0.5" fill="#94969f" text-anchor="middle">PRO</text>
+    <!-- rate windows -->
+    <text x="100" y="66" font-size="11.5" fill="#94969f">5h &#183; 62% left &#183; resets in 3h 12m</text>
+    <text x="100" y="82" font-size="11.5" fill="#94969f">Weekly &#183; 78% left &#183; resets in 4d 2h</text>
+    <!-- bottom -->
+    <line x1="30" y1="110" x2="350" y2="110" stroke="rgba(255,255,255,0.07)"/>
+    <text x="30" y="128" font-size="11" fill="#94969f">Today 12.4M in &#183; 18.2K out &#183; $6.40 est.</text>
+    <!-- 7-day capsule chart, today = last bar -->
+    <g fill="#cc7a5c">
+      <rect x="47.5"  y="168" width="9" height="10" rx="4.5" opacity="0.45"/>
+      <rect x="93.5"  y="171" width="9" height="7"  rx="3.5" opacity="0.45"/>
+      <rect x="139.5" y="166" width="9" height="12" rx="4.5" opacity="0.45"/>
+      <rect x="185.5" y="162" width="9" height="16" rx="4.5" opacity="0.45"/>
+      <rect x="231.5" y="144" width="9" height="34" rx="4.5" opacity="0.45"/>
+      <rect x="277.5" y="134" width="9" height="44" rx="4.5" opacity="0.45"/>
+      <rect x="323.5" y="164" width="9" height="14" rx="4.5"/>
+    </g>
+    <text x="328" y="156" font-size="9" font-weight="600" fill="#94969f" text-anchor="middle">12.4M</text>
+    <g font-size="9" fill="#66686f" text-anchor="middle">
+      <text x="52" y="192">T</text><text x="98" y="192">W</text><text x="144" y="192">T</text>
+      <text x="190" y="192">F</text><text x="236" y="192">S</text><text x="282" y="192">S</text>
+      <text x="328" y="192" fill="#94969f" font-weight="600">M</text>
+    </g>
+  </g>
+
+  <!-- ============================== Codex =============================== -->
+  <g>
+    <rect x="14" y="220" width="352" height="196" rx="12" fill="#101014" stroke="rgba(255,255,255,0.07)"/>
+    <!-- ring: 91% green -->
+    <circle cx="58" cy="262" r="25.5" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="5"/>
+    <circle cx="58" cy="262" r="25.5" fill="none" stroke="#97c459" stroke-width="5" stroke-linecap="round"
+            stroke-dasharray="145.8 160.2" transform="rotate(-90 58 262)"/>
+    <text x="58" y="268" font-size="17" font-weight="600" fill="#ececf0" text-anchor="middle">91</text>
+    <circle cx="104" cy="245" r="3.5" fill="#4d9de0"/>
+    <text x="114" y="250" font-size="14.5" font-weight="600" fill="#ececf0">Codex</text>
+    <rect x="166" y="237" width="42" height="17" rx="8.5" fill="none" stroke="rgba(255,255,255,0.15)"/>
+    <text x="187" y="249" font-size="9.5" font-weight="600" letter-spacing="0.5" fill="#94969f" text-anchor="middle">PLUS</text>
+    <text x="100" y="276" font-size="11.5" fill="#94969f">30d &#183; 91% left &#183; resets in 22d 10h</text>
+    <line x1="30" y1="316" x2="350" y2="316" stroke="rgba(255,255,255,0.07)"/>
+    <text x="30" y="334" font-size="11" fill="#94969f">Today 3.1M in &#183; 9.8K out &#183; $1.12 est.</text>
+    <g fill="#4d9de0">
+      <rect x="47.5"  y="378" width="9" height="6"  rx="3"   opacity="0.45"/>
+      <rect x="93.5"  y="375" width="9" height="9"  rx="4.5" opacity="0.45"/>
+      <rect x="139.5" y="376" width="9" height="8"  rx="4"   opacity="0.45"/>
+      <rect x="185.5" y="372" width="9" height="12" rx="4.5" opacity="0.45"/>
+      <rect x="231.5" y="364" width="9" height="20" rx="4.5" opacity="0.45"/>
+      <rect x="277.5" y="358" width="9" height="26" rx="4.5" opacity="0.45"/>
+      <rect x="323.5" y="374" width="9" height="10" rx="4.5"/>
+    </g>
+    <text x="328" y="366" font-size="9" font-weight="600" fill="#94969f" text-anchor="middle">3.1M</text>
+    <g font-size="9" fill="#66686f" text-anchor="middle">
+      <text x="52" y="398">T</text><text x="98" y="398">W</text><text x="144" y="398">T</text>
+      <text x="190" y="398">F</text><text x="236" y="398">S</text><text x="282" y="398">S</text>
+      <text x="328" y="398" fill="#94969f" font-weight="600">M</text>
+    </g>
+  </g>
+
+  <!-- =============================== Grok =============================== -->
+  <g>
+    <rect x="14" y="426" width="352" height="196" rx="12" fill="#101014" stroke="rgba(255,255,255,0.07)"/>
+    <!-- ring: 18% amber -->
+    <circle cx="58" cy="468" r="25.5" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="5"/>
+    <circle cx="58" cy="468" r="25.5" fill="none" stroke="#ef9f27" stroke-width="5" stroke-linecap="round"
+            stroke-dasharray="28.8 160.2" transform="rotate(-90 58 468)"/>
+    <text x="58" y="474" font-size="17" font-weight="600" fill="#ececf0" text-anchor="middle">18</text>
+    <circle cx="104" cy="451" r="3.5" fill="#8b7cf0"/>
+    <text x="114" y="456" font-size="14.5" font-weight="600" fill="#ececf0">Grok</text>
+    <rect x="156" y="443" width="58" height="17" rx="8.5" fill="none" stroke="rgba(255,255,255,0.15)"/>
+    <text x="185" y="455" font-size="9.5" font-weight="600" letter-spacing="0.5" fill="#94969f" text-anchor="middle">CREDITS</text>
+    <text x="100" y="478" font-size="11.5" fill="#94969f">Credits &#183; 18% left</text>
+    <text x="100" y="494" font-size="11.5" fill="#ef9f27">&#8776; exhausted in 2d 4h</text>
+    <line x1="30" y1="522" x2="350" y2="522" stroke="rgba(255,255,255,0.07)"/>
+    <text x="30" y="540" font-size="11" fill="#94969f">Today 840K ctx &#183; $0.92 est.</text>
+    <g fill="#8b7cf0">
+      <rect x="47.5"  y="578" width="9" height="12" rx="4.5" opacity="0.45"/>
+      <rect x="93.5"  y="574" width="9" height="16" rx="4.5" opacity="0.45"/>
+      <rect x="139.5" y="568" width="9" height="22" rx="4.5" opacity="0.45"/>
+      <rect x="185.5" y="572" width="9" height="18" rx="4.5" opacity="0.45"/>
+      <rect x="231.5" y="564" width="9" height="26" rx="4.5" opacity="0.45"/>
+      <rect x="277.5" y="560" width="9" height="30" rx="4.5" opacity="0.45"/>
+      <rect x="323.5" y="570" width="9" height="20" rx="4.5"/>
+    </g>
+    <text x="328" y="562" font-size="9" font-weight="600" fill="#94969f" text-anchor="middle">840K</text>
+    <g font-size="9" fill="#66686f" text-anchor="middle">
+      <text x="52" y="604">T</text><text x="98" y="604">W</text><text x="144" y="604">T</text>
+      <text x="190" y="604">F</text><text x="236" y="604">S</text><text x="282" y="604">S</text>
+      <text x="328" y="604" fill="#94969f" font-weight="600">M</text>
+    </g>
+  </g>
+
+  <!-- ============================= DeepSeek ============================= -->
+  <g>
+    <rect x="14" y="632" width="352" height="196" rx="12" fill="#101014" stroke="rgba(255,255,255,0.07)"/>
+    <!-- ring: 6% red -->
+    <circle cx="58" cy="674" r="25.5" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="5"/>
+    <circle cx="58" cy="674" r="25.5" fill="none" stroke="#e24b4a" stroke-width="5" stroke-linecap="round"
+            stroke-dasharray="9.6 160.2" transform="rotate(-90 58 674)"/>
+    <text x="58" y="680" font-size="17" font-weight="600" fill="#ececf0" text-anchor="middle">6</text>
+    <circle cx="104" cy="657" r="3.5" fill="#3aa981"/>
+    <text x="114" y="662" font-size="14.5" font-weight="600" fill="#ececf0">DeepSeek</text>
+    <rect x="196" y="649" width="34" height="17" rx="8.5" fill="none" stroke="rgba(255,255,255,0.15)"/>
+    <text x="213" y="661" font-size="9.5" font-weight="600" letter-spacing="0.5" fill="#94969f" text-anchor="middle">API</text>
+    <text x="100" y="684" font-size="11.5" fill="#94969f">Balance &#183; &#165;6.20 of &#165;100.00 &#183; 6% left</text>
+    <text x="100" y="700" font-size="11.5" fill="#e24b4a">&#8776; exhausted in 5d 2h</text>
+    <line x1="30" y1="728" x2="350" y2="728" stroke="rgba(255,255,255,0.07)"/>
+    <text x="30" y="746" font-size="11" fill="#94969f">Today 1.2M in &#183; 4.1K out &#183; &#165;0.86 est.</text>
+    <g fill="#3aa981">
+      <rect x="47.5"  y="788" width="9" height="8"  rx="4"   opacity="0.45"/>
+      <rect x="93.5"  y="786" width="9" height="10" rx="4.5" opacity="0.45"/>
+      <rect x="139.5" y="782" width="9" height="14" rx="4.5" opacity="0.45"/>
+      <rect x="185.5" y="784" width="9" height="12" rx="4.5" opacity="0.45"/>
+      <rect x="231.5" y="778" width="9" height="18" rx="4.5" opacity="0.45"/>
+      <rect x="277.5" y="774" width="9" height="22" rx="4.5" opacity="0.45"/>
+      <rect x="323.5" y="780" width="9" height="16" rx="4.5"/>
+    </g>
+    <text x="328" y="772" font-size="9" font-weight="600" fill="#94969f" text-anchor="middle">1.2M</text>
+    <g font-size="9" fill="#66686f" text-anchor="middle">
+      <text x="52" y="814">T</text><text x="98" y="814">W</text><text x="144" y="814">T</text>
+      <text x="190" y="814">F</text><text x="236" y="814">S</text><text x="282" y="814">S</text>
+      <text x="328" y="814" fill="#94969f" font-weight="600">M</text>
+    </g>
+  </g>
+
+  <!-- footer -->
+  <text x="190" y="850" font-size="10" fill="#66686f" text-anchor="middle" opacity="0.85">&#8635; updated 12s ago</text>
+</svg>

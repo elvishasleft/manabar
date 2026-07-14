@@ -294,7 +294,7 @@ async fn deepseek_fetch_happy_path() {
     assert_eq!(snap.windows.len(), 1);
     assert_eq!(snap.windows[0].label, "Balance");
     assert_eq!(snap.windows[0].used_percent, 0.0);
-    assert_eq!(snap.plan.as_deref(), Some("¥97.97"));
+    assert_eq!(snap.plan.as_deref(), Some("¥42.50"));
 }
 
 #[tokio::test]

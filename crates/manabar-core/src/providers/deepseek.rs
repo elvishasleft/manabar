@@ -122,7 +122,7 @@ mod tests {
         assert_eq!(snap.windows[0].label, "Balance");
         assert_eq!(snap.windows[0].used_percent, 0.0);
         assert!(snap.windows[0].resets_at.is_none());
-        assert_eq!(snap.plan.as_deref(), Some("¥97.97"));
+        assert_eq!(snap.plan.as_deref(), Some("¥42.50"));
     }
 
     #[test]
@@ -136,8 +136,8 @@ mod tests {
     fn budget_computes_used_percent_from_ratio() {
         let snap = parse_balance(FIXTURE, Some(200.0), Utc::now()).unwrap();
         assert!(
-            (snap.windows[0].used_percent - 51.015).abs() < 0.001,
-            "expected ~51.015, got {}",
+            (snap.windows[0].used_percent - 78.75).abs() < 0.001,
+            "expected ~78.75, got {}",
             snap.windows[0].used_percent
         );
     }

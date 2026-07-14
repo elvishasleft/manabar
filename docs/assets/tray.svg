@@ -1,0 +1,51 @@
+<svg viewBox="0 0 880 168" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ManaBar in the Windows system tray with hover tooltip" font-family="'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif">
+  <rect x="0" y="0" width="880" height="168" rx="16" fill="#0b0b0e"/>
+
+  <!-- tooltip -->
+  <g>
+    <rect x="356" y="26" width="404" height="34" rx="6" fill="#2b2b30" stroke="rgba(255,255,255,0.10)"/>
+    <text x="558" y="48" font-size="13.5" fill="#ececf0" text-anchor="middle">Claude 62% &#183; Codex 91% &#183; Grok 18% &#183; DeepSeek 6%</text>
+    <path d="M 700 60 l 7 10 l 7 -10 z" fill="#2b2b30"/>
+  </g>
+
+  <!-- taskbar fragment -->
+  <rect x="24" y="86" width="832" height="56" rx="10" fill="#17171c" stroke="rgba(255,255,255,0.08)"/>
+
+  <!-- left: start + search hints (abstract) -->
+  <g fill="#94969f">
+    <rect x="52" y="106" width="16" height="16" rx="3" opacity="0.8"/>
+    <circle cx="106" cy="114" r="7" fill="none" stroke="#94969f" stroke-width="2.4" opacity="0.8"/>
+    <line x1="111" y1="119" x2="116" y2="124" stroke="#94969f" stroke-width="2.4" opacity="0.8" stroke-linecap="round"/>
+    <rect x="146" y="104" width="20" height="20" rx="4" fill="none" stroke="#94969f" stroke-width="2" opacity="0.5"/>
+    <rect x="186" y="104" width="20" height="20" rx="4" fill="none" stroke="#94969f" stroke-width="2" opacity="0.5"/>
+  </g>
+
+  <!-- right: tray area -->
+  <g>
+    <!-- chevron -->
+    <path d="M 566 118 l 5 -5 l 5 5" fill="none" stroke="#94969f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- wifi -->
+    <g stroke="#b9bbc2" stroke-width="2" fill="none" stroke-linecap="round">
+      <path d="M 614 116 a 12 12 0 0 1 20 0" opacity="0.5"/>
+      <path d="M 618 120 a 7 7 0 0 1 12 0" opacity="0.8"/>
+      <circle cx="624" cy="124" r="1.6" fill="#b9bbc2" stroke="none"/>
+    </g>
+    <!-- speaker -->
+    <g fill="#b9bbc2">
+      <path d="M 660 110 l 6 0 l 7 -6 l 0 20 l -7 -6 l -6 0 z" opacity="0.9"/>
+    </g>
+
+    <!-- ManaBar tray icon: four health bars -->
+    <g>
+      <rect x="698" y="98" width="32" height="32" rx="6" fill="#101014" stroke="rgba(255,255,255,0.14)"/>
+      <rect x="703" y="108" width="4" height="16" rx="2" fill="#97c459"/>
+      <rect x="710" y="106" width="4" height="18" rx="2" fill="#97c459"/>
+      <rect x="717" y="116" width="4" height="8"  rx="2" fill="#ef9f27"/>
+      <rect x="724" y="120" width="4" height="4"  rx="2" fill="#e24b4a"/>
+    </g>
+
+    <!-- clock -->
+    <text x="762" y="112" font-size="12.5" fill="#ececf0">9:47 PM</text>
+    <text x="762" y="128" font-size="12.5" fill="#ececf0">7/14/2026</text>
+  </g>
+</svg>

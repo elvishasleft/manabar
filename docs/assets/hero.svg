@@ -1,0 +1,33 @@
+<svg viewBox="0 0 880 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ManaBar — one tray icon for every AI quota">
+  <defs>
+    <clipPath id="canvas"><rect x="0" y="0" width="880" height="230" rx="16"/></clipPath>
+  </defs>
+  <g clip-path="url(#canvas)">
+    <rect x="0" y="0" width="880" height="230" fill="#0b0b0e"/>
+    <!-- faint identity-accent glow strips along the bottom -->
+    <rect x="0" y="222" width="220" height="8" fill="#cc7a5c" opacity="0.55"/>
+    <rect x="220" y="222" width="220" height="8" fill="#4d9de0" opacity="0.55"/>
+    <rect x="440" y="222" width="220" height="8" fill="#8b7cf0" opacity="0.55"/>
+    <rect x="660" y="222" width="220" height="8" fill="#3aa981" opacity="0.55"/>
+
+    <!-- enlarged tray icon tile -->
+    <rect x="48" y="47" width="128" height="128" rx="28" fill="#17171c" stroke="rgba(255,255,255,0.09)"/>
+    <!-- four health bars: heights = remaining, colors = health -->
+    <rect x="72"  y="79"  width="16" height="64" rx="8" fill="#97c459"/>
+    <rect x="94"  y="71"  width="16" height="72" rx="8" fill="#97c459"/>
+    <rect x="116" y="111" width="16" height="32" rx="8" fill="#ef9f27"/>
+    <rect x="138" y="127" width="16" height="16" rx="8" fill="#e24b4a"/>
+
+    <g font-family="'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif">
+      <text x="228" y="105" font-size="54" font-weight="700" letter-spacing="-1" fill="#ececf0">ManaBar</text>
+      <text x="232" y="141" font-size="18" fill="#94969f">One tray icon for every AI quota.</text>
+      <g font-size="14" font-weight="600">
+        <circle cx="238" cy="171" r="4" fill="#cc7a5c"/><text x="249" y="176" fill="#b9bbc2">Claude Code</text>
+        <circle cx="366" cy="171" r="4" fill="#4d9de0"/><text x="377" y="176" fill="#b9bbc2">Codex CLI</text>
+        <circle cx="474" cy="171" r="4" fill="#8b7cf0"/><text x="485" y="176" fill="#b9bbc2">Grok CLI</text>
+        <circle cx="573" cy="171" r="4" fill="#3aa981"/><text x="584" y="176" fill="#b9bbc2">DeepSeek</text>
+      </g>
+      <text x="232" y="203" font-size="12.5" fill="#66686f">Windows &#183; macOS &#8212; Rust + Tauri v2 &#8212; reads your CLI sign-ins, never writes them</text>
+    </g>
+  </g>
+</svg>
