@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ManaBar terminal installer/updater for macOS (Apple silicon).
-# Usage: curl -fsSL https://raw.githubusercontent.com/arteeeezy/manabar/main/scripts/install-mac.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/elvishasleft/manabar/main/scripts/install-mac.sh | bash
 set -euo pipefail
 
-REPO="arteeeezy/manabar"
+REPO="elvishasleft/manabar"
 TMP="$(mktemp -d)"
 MNT="$TMP/mnt"
 trap 'hdiutil detach "$MNT" -quiet 2>/dev/null || true; rm -rf "$TMP"' EXIT

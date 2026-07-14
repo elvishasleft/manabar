@@ -2,9 +2,9 @@
 
 ![ManaBar — one tray icon for every AI quota](docs/assets/hero.svg)
 
-[![CI](https://github.com/arteeeezy/manabar/actions/workflows/ci.yml/badge.svg)](https://github.com/arteeeezy/manabar/actions/workflows/ci.yml)
+[![CI](https://github.com/elvishasleft/manabar/actions/workflows/ci.yml/badge.svg)](https://github.com/elvishasleft/manabar/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/arteeeezy/manabar)](https://github.com/arteeeezy/manabar/releases)
+[![Release](https://img.shields.io/github/v/release/elvishasleft/manabar)](https://github.com/elvishasleft/manabar/releases)
 
 </div>
 
@@ -79,13 +79,13 @@ Windows, `Start at Login` on macOS), and `Quit`.
 ## Install
 
 Prebuilt installers are attached to
-[Releases](https://github.com/arteeeezy/manabar/releases) — a Windows
+[Releases](https://github.com/elvishasleft/manabar/releases) — a Windows
 NSIS setup, a portable single-file exe, and a macOS `.dmg` with a
 terminal one-liner installer (see [macOS](#macos)). On Windows you can
 also build from source:
 
 ```bash
-git clone https://github.com/arteeeezy/manabar.git
+git clone https://github.com/elvishasleft/manabar.git
 cd manabar
 npm install
 npm run tauri build
@@ -104,7 +104,7 @@ the uninstaller next to the installed exe (NSIS default:
 `%LOCALAPPDATA%\ManaBar\uninstall.exe`).
 
 **Portable:** no-install option — download `ManaBar_<version>_portable.exe`
-from [Releases](https://github.com/arteeeezy/manabar/releases) and run it
+from [Releases](https://github.com/elvishasleft/manabar/releases) and run it
 directly; there's nothing to install or uninstall. Config still lives in
 `%APPDATA%\manabar` (same place as the installed builds), so settings
 carry over if you later switch to an installer build. Because the
@@ -144,7 +144,7 @@ signing/notarization, and the App Store are out of scope for now.
   install or upgrade to the latest release in one command:
 
   ```bash
-  curl -fsSL https://raw.githubusercontent.com/arteeeezy/manabar/main/scripts/install-mac.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/elvishasleft/manabar/main/scripts/install-mac.sh | bash
   ```
 
   This downloads the latest `.dmg` release asset, replaces
@@ -153,7 +153,7 @@ signing/notarization, and the App Store are out of scope for now.
   right-click-Open dance, and launches the app. Re-run the same
   command any time to upgrade to the newest release.
 - **Install (manual, fallback):** download the `.dmg` from
-  [Releases](https://github.com/arteeeezy/manabar/releases), open it,
+  [Releases](https://github.com/elvishasleft/manabar/releases), open it,
   and drag `ManaBar.app` into `Applications` (or run it directly from
   the mounted volume). The build is unsigned/not notarized, so
   Gatekeeper blocks a plain double-click the first time —
