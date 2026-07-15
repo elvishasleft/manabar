@@ -4,6 +4,7 @@ pub mod model;
 pub mod pricing;
 pub mod providers;
 pub mod quota_math;
+pub mod updater;
 pub mod usage_logs;
 
 pub use model::*;
