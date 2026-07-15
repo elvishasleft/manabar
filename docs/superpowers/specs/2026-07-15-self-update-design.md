@@ -58,6 +58,35 @@ version — no half-updated state.
 macOS: the Update button opens the Releases page (opener plugin). A
 DMG cannot be swapped in place gracefully; not attempted.
 
+## Security & privacy (hard requirements)
+
+- **Zero telemetry.** The update check is a single anonymous `GET` to
+  GitHub's public API once per day. It carries no user identifier, no
+  machine identifier, no usage data — nothing beyond what any HTTPS
+  request exposes (client IP to GitHub). Nothing is ever POSTed.
+- **Credential isolation.** The updater never touches provider
+  credentials. It uses a bare HTTP client with no auth headers; the
+  token-loading code paths are not reachable from the updater module.
+- **Pinned source.** Only `https://api.github.com/repos/elvishasleft/
+  manabar/releases/latest` is queried, and only asset URLs returned by
+  that response are downloaded. No redirects to non-GitHub hosts are
+  followed (reqwest redirect policy restricted to github.com hosts for
+  the download request).
+- **Integrity check.** Downloaded byte count must equal the asset
+  `size` from the API response; mismatch → delete the partial file and
+  abort. Nothing downloaded is ever executed without the user having
+  clicked Update.
+- **Injection safety.** `tag_name` and release URL are attacker-ish
+  inputs (repo compromise scenario). They are rendered in the panel
+  through the same escaping helpers covered by the existing CSP
+  regression tests; the version string is additionally validated
+  against `^v?[0-9]+(\.[0-9]+)*$` before use, and the notes URL must
+  have prefix `https://github.com/elvishasleft/manabar/`.
+- **Opener scope.** `tauri-plugin-opener` capability is restricted to
+  opening URLs; only the validated release-page URL is ever passed.
+- **User control.** `update_check: false` disables the network check
+  entirely. No background installs — updating always requires a click.
+
 ## Accepted trade-offs
 
 - No signature verification: the portable build has no signing-key
