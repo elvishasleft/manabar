@@ -66,7 +66,7 @@ pub struct Config {
     pub menubar_text: bool,
     /// Daily anonymous check of the GitHub releases feed. `false` disables
     /// the network call entirely (privacy opt-out; see the spec's security
-    /// section).
+    /// section). Defaults to `true`.
     pub update_check: bool,
 }
 
@@ -449,5 +449,10 @@ mod tests {
         assert!(Config::default().update_check);
         let cfg: Config = serde_json::from_str(r#"{"update_check":false}"#).unwrap();
         assert!(!cfg.update_check);
+        let missing: Config = serde_json::from_str(r#"{"poll_interval_secs":900}"#).unwrap();
+        assert!(
+            missing.update_check,
+            "missing update_check key must default to true"
+        );
     }
 }
