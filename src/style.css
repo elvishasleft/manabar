@@ -420,3 +420,27 @@ footer::before {
     animation: none !important;
   }
 }
+
+/* ------------------------------ update notice ------------------------------ */
+
+.update-line {
+  margin-top: 6px;
+  font-size: 12px;
+}
+.update-btn,
+.update-notes {
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: inherit;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 1px 8px;
+}
+.update-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.update-err {
+  color: var(--health-red);
+}

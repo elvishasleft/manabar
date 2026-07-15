@@ -6,10 +6,16 @@ import {
   card,
   failedRefresh,
   pendingRefresh,
+  updateNotice,
+  type UpdateInfo,
+  type UpdatePhase,
   type View,
 } from "./render";
 
 let current: View[] = [];
+let updateInfo: UpdateInfo | null = null;
+let updatePhase: UpdatePhase = "idle";
+let updateError: string | undefined;
 
 // Under `require-trusted-types-for 'script'` (see the CSP in
 // src-tauri/tauri.conf.json) the webview rejects plain-string assignment to
@@ -39,7 +45,8 @@ function render(views: View[]) {
   const visible = views.filter((v) => v.enabled);
   const updated = visible.find((v) => v.updated_at)?.updated_at ?? null;
   document.querySelector<HTMLElement>("#app")!.innerHTML = asRenderedHtml(
-    visible.map(card).join("") + `<footer>updated ${age(updated) || "—"}</footer>`,
+    visible.map(card).join("") +
+      `<footer>updated ${age(updated) || "—"}${updateNotice(updateInfo, updatePhase, updateError)}</footer>`,
   );
 }
 
@@ -50,6 +57,22 @@ function render(views: View[]) {
 // carry the button state across re-renders; the direct DOM mutations here
 // just give instant feedback before the next render.
 document.querySelector<HTMLElement>("#app")!.addEventListener("click", (e) => {
+  const notes = (e.target as HTMLElement).closest<HTMLButtonElement>(".update-notes");
+  if (notes) {
+    invoke("open_release_notes").catch((err) => console.error("open_release_notes failed", err));
+    return;
+  }
+  const upd = (e.target as HTMLElement).closest<HTMLButtonElement>(".update-btn");
+  if (upd && !upd.disabled && updatePhase !== "busy") {
+    updatePhase = "busy";
+    if (current.length) render(current);
+    invoke("apply_update").catch((err) => {
+      updatePhase = "error";
+      updateError = String(err);
+      if (current.length) render(current);
+    });
+    return;
+  }
   const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(".refresh-btn");
   if (!btn || btn.disabled) return;
   const kind = btn.dataset.kind;
@@ -73,6 +96,18 @@ document.querySelector<HTMLElement>("#app")!.addEventListener("click", (e) => {
 });
 
 listen<View[]>("state", (e) => render(e.payload));
+listen<UpdateInfo | null>("update", (e) => {
+  updateInfo = e.payload;
+  updatePhase = "idle";
+  updateError = undefined;
+  if (current.length) render(current);
+});
+invoke<UpdateInfo | null>("update_status")
+  .then((u) => {
+    updateInfo = u;
+    if (current.length) render(current);
+  })
+  .catch(() => {});
 listen("panel-shown", () => {
   invoke<View[]>("panel_opened").then(render).catch((e) => console.error("panel_opened failed", e));
 });
