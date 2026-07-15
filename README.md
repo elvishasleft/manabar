@@ -238,6 +238,19 @@ No action needed; this happens transparently on startup.
 | `deepseek_budget` | number or `null` | `null` | Optional total balance budget (same currency as your DeepSeek account, e.g. CNY) for turning the `Balance` window into a real used-percent gauge: `used% = (1 - balance/budget) × 100`, clamped 0-100. Without a budget, DeepSeek's card is a binary green/red signal from the account's own `is_available` flag — 0% used while usable, 100% once DeepSeek reports it can't serve requests. |
 | `menubar_text` | bool | `true` | **macOS only** (ignored on Windows). Shows `"{letter} {percent}%"` next to the tray icon in the menu bar for the binding provider — see [macOS](#macos) above. Set to `false` for an icon-only menu bar. |
 
+## Updates
+
+Once a day ManaBar makes a single anonymous request to the GitHub
+releases feed of this repository to see whether a newer version exists.
+Nothing is sent beyond the request itself — no identifiers, no usage
+data, no telemetry — and nothing is ever installed without you clicking
+**Update**. When a new version exists the panel footer shows
+`vX.Y.Z available · Update · notes ↗`; on Windows, **Update** downloads
+the portable exe from this repository's GitHub Releases (byte count
+verified against the API-reported size), swaps it in place, and
+restarts; on macOS it opens the Releases page. Set
+`"update_check": false` in `config.json` to disable the check entirely.
+
 ## How it works
 
 ManaBar never asks you to sign in. It reads the credential files your
