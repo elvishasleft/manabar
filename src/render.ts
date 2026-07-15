@@ -284,10 +284,10 @@ export function updateNotice(
   if (!u) return "";
   const btn =
     phase === "busy"
-      ? `<button class="update-btn" disabled>downloading…</button>`
-      : `<button class="update-btn">Update</button>`;
+      ? `<button type="button" class="update-btn" disabled>downloading…</button>`
+      : `<button type="button" class="update-btn">Update</button>`;
   const err = phase === "error" && error ? ` <span class="update-err">${esc(error)}</span>` : "";
-  return `<div class="update-line">v${esc(u.version)} available · ${btn} · <button class="update-notes">notes ↗</button>${err}</div>`;
+  return `<div class="update-line">v${esc(u.version)} available · ${btn} · <button type="button" class="update-notes">notes ↗</button>${err}</div>`;
 }
 
 export function card(v: View): string {

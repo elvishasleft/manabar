@@ -18,6 +18,30 @@ fn ua() -> String {
     format!("manabar/{}", env!("CARGO_PKG_VERSION"))
 }
 
+/// Redirect policy for both updater HTTP clients: only follow redirects that
+/// stay on `https` and land on `github.com`, `api.github.com`, or a
+/// `*.githubusercontent.com` host (GitHub's release assets legitimately
+/// redirect to `objects.githubusercontent.com` and similar). Anything else —
+/// scheme downgrade, a foreign host, or an excessive redirect chain — is
+/// rejected so a compromised or malicious redirect can never send the
+/// download (or the daily check) somewhere outside the pinned GitHub hosts.
+fn github_only_redirects() -> reqwest::redirect::Policy {
+    reqwest::redirect::Policy::custom(|attempt| {
+        let url = attempt.url();
+        let host_ok = url.host_str().is_some_and(|h| {
+            h == "github.com"
+                || h == "api.github.com"
+                || h == "githubusercontent.com"
+                || h.ends_with(".githubusercontent.com")
+        });
+        if url.scheme() == "https" && host_ok && attempt.previous().len() <= 5 {
+            attempt.follow()
+        } else {
+            attempt.error("redirect outside pinned GitHub hosts")
+        }
+    })
+}
+
 pub fn spawn(app: AppHandle, enabled: bool) {
     if !enabled {
         return;
@@ -26,6 +50,7 @@ pub fn spawn(app: AppHandle, enabled: bool) {
         let client = match reqwest::Client::builder()
             .user_agent(ua())
             .timeout(HTTP_TIMEOUT)
+            .redirect(github_only_redirects())
             .build()
         {
             Ok(c) => c,
@@ -112,8 +137,29 @@ pub async fn apply(app: AppHandle, info: UpdateInfo) -> Result<(), String> {
     result
 }
 
-/// Windows: download → size-check → rename dance → relaunch. Every failure
-/// rolls back to the pre-step state and returns Err for the panel to show.
+/// Windows `CREATE_NO_WINDOW` flag: suppresses the console window the
+/// detached relaunch `cmd.exe` would otherwise flash open.
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+/// Hex-encodes a SHA-256 digest as lowercase hex, matching the format GitHub
+/// uses in the asset `digest` field (`"sha256:<hex>"`). No `hex` crate
+/// needed for a single fixed-width fold.
+#[cfg(windows)]
+fn hex_encode(bytes: &[u8]) -> String {
+    bytes
+        .iter()
+        .fold(String::with_capacity(bytes.len() * 2), |mut s, b| {
+            use std::fmt::Write;
+            let _ = write!(s, "{b:02x}");
+            s
+        })
+}
+
+/// Windows: download → size-check → digest-check → rename dance → relaunch.
+/// Every failure rolls back to the pre-step state and returns Err for the
+/// panel to show, except a double fault, which preserves `.old`/`.new` for
+/// manual recovery.
 #[cfg(windows)]
 async fn apply_inner(app: AppHandle, info: UpdateInfo) -> Result<(), String> {
     let (Some(url), Some(size)) = (info.asset_url.clone(), info.asset_size) else {
@@ -126,6 +172,7 @@ async fn apply_inner(app: AppHandle, info: UpdateInfo) -> Result<(), String> {
     let client = reqwest::Client::builder()
         .user_agent(ua())
         .timeout(Duration::from_secs(600))
+        .redirect(github_only_redirects())
         .build()
         .map_err(|e| e.to_string())?;
     let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
@@ -138,6 +185,17 @@ async fn apply_inner(app: AppHandle, info: UpdateInfo) -> Result<(), String> {
             "size mismatch: got {} bytes, expected {size}",
             bytes.len()
         ));
+    }
+    if let Some(digest) = &info.asset_digest {
+        // Already validated as `"sha256:" + 64 hex chars` by manabar-core;
+        // strip_prefix here is just extracting the hex half for comparison.
+        if let Some(expected_hex) = digest.strip_prefix("sha256:") {
+            use sha2::Digest;
+            let actual_hex = hex_encode(&sha2::Sha256::digest(&bytes));
+            if !actual_hex.eq_ignore_ascii_case(expected_hex) {
+                return Err("digest mismatch — download rejected".into());
+            }
+        }
     }
     if let Err(e) = std::fs::write(&new, &bytes) {
         let _ = std::fs::remove_file(&new);
@@ -164,7 +222,20 @@ async fn apply_inner(app: AppHandle, info: UpdateInfo) -> Result<(), String> {
         let _ = std::fs::remove_file(&new);
         return Err(format!("swap failed: {e}"));
     }
-    std::process::Command::new(&exe)
+
+    // Relaunch via a detached ~2s delay so the old process has fully exited
+    // before the new one hits the single-instance check (otherwise the new
+    // instance can forward to the dying process and quit).
+    use std::os::windows::process::CommandExt;
+    std::process::Command::new("cmd")
+        .args([
+            "/C",
+            &format!(
+                "ping -n 3 127.0.0.1 > nul & start \"\" \"{}\"",
+                exe.display()
+            ),
+        ])
+        .creation_flags(CREATE_NO_WINDOW)
         .spawn()
         .map_err(|e| format!("relaunch failed (update IS installed): {e}"))?;
     app.exit(0);

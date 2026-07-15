@@ -9,12 +9,25 @@ pub const RELEASES_LATEST_URL: &str =
 const NOTES_PREFIX: &str = "https://github.com/elvishasleft/manabar/";
 const ASSET_PREFIX: &str = "https://github.com/elvishasleft/manabar/releases/download/";
 
+/// Assets larger than this are excluded from one-click asset selection —
+/// treated the same as a foreign-host asset (the update notice still shows,
+/// but there is no one-click download). Portable builds are nowhere near
+/// this size, so a value this large means the API response is unexpected;
+/// it is a sanity cap, not a realistic ceiling.
+pub const MAX_ASSET_SIZE: u64 = 100 * 1024 * 1024;
+
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct UpdateInfo {
     pub version: String,
     pub notes_url: String,
     pub asset_url: Option<String>,
     pub asset_size: Option<u64>,
+    /// `Some("sha256:<64 lowercase-or-mixed hex chars>")` when the API's
+    /// asset `digest` field is present and well-formed; `None` otherwise
+    /// (missing field, non-sha256 algorithm, or malformed hex). Callers
+    /// treat `None` as "no digest available" — size-only verification
+    /// remains the floor.
+    pub asset_digest: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -22,6 +35,8 @@ struct AssetRaw {
     name: String,
     size: u64,
     browser_download_url: String,
+    #[serde(default)]
+    digest: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -56,14 +71,27 @@ pub fn parse_latest_release(
         return Ok(None);
     }
     let asset = raw.assets.iter().find(|a| {
-        a.name.ends_with("_portable.exe") && a.browser_download_url.starts_with(ASSET_PREFIX)
+        a.name.ends_with("_portable.exe")
+            && a.browser_download_url.starts_with(ASSET_PREFIX)
+            && a.size <= MAX_ASSET_SIZE
     });
     Ok(Some(UpdateInfo {
         version: raw.tag_name.trim_start_matches('v').to_string(),
         notes_url: raw.html_url,
         asset_url: asset.map(|a| a.browser_download_url.clone()),
         asset_size: asset.map(|a| a.size),
+        asset_digest: asset.and_then(|a| valid_sha256_digest(a.digest.as_deref())),
     }))
+}
+
+/// Validates a GitHub asset `digest` field: must be exactly `"sha256:"`
+/// followed by 64 ASCII hex characters. Anything else — missing, a
+/// different algorithm prefix, wrong length, non-hex characters — is
+/// treated as if the API never reported a digest.
+fn valid_sha256_digest(digest: Option<&str>) -> Option<String> {
+    let d = digest?;
+    let hex = d.strip_prefix("sha256:")?;
+    (hex.len() == 64 && hex.bytes().all(|b| b.is_ascii_hexdigit())).then(|| d.to_string())
 }
 
 /// Parses `"v1.2.3"` / `"1.2.3"` into numeric segments. Returns `None` for
@@ -74,7 +102,13 @@ pub(crate) fn parse_version(tag: &str) -> Option<Vec<u64>> {
     if bare.is_empty() {
         return None;
     }
-    bare.split('.').map(|s| s.parse::<u64>().ok()).collect()
+    bare.split('.')
+        .map(|s| {
+            (!s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()))
+                .then(|| s.parse::<u64>().ok())
+                .flatten()
+        })
+        .collect()
 }
 
 /// True when `candidate_tag` is a valid version strictly newer than
@@ -134,6 +168,15 @@ mod tests {
         assert_eq!(parse_version("<img src=x>"), None);
     }
 
+    #[test]
+    fn parse_version_rejects_plus_prefixed_segments() {
+        // `u64::from_str` (via `.parse::<u64>()`) accepts a leading `+`, so
+        // without an explicit digits-only guard "+1.2.3" and "1.+2" would
+        // both parse as valid versions.
+        assert_eq!(parse_version("+1.2.3"), None);
+        assert_eq!(parse_version("1.+2"), None);
+    }
+
     const FIXTURE: &str = include_str!("../tests/fixtures/github_release.json");
 
     #[test]
@@ -150,6 +193,46 @@ mod tests {
             .unwrap()
             .ends_with("_portable.exe"));
         assert_eq!(info.asset_size, Some(2222));
+        assert_eq!(
+            info.asset_digest.as_deref(),
+            Some("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        );
+    }
+
+    #[test]
+    fn malformed_digest_yields_no_asset_digest() {
+        let wrong_algo = r#"{"tag_name":"v9.9.9","html_url":"https://github.com/elvishasleft/manabar/releases/tag/v9.9.9","assets":[{"name":"ManaBar_9.9.9_portable.exe","size":5,"browser_download_url":"https://github.com/elvishasleft/manabar/releases/download/v9.9.9/ManaBar_9.9.9_portable.exe","digest":"md5:0123456789abcdef0123456789abcdef"}]}"#;
+        let info = parse_latest_release(wrong_algo, "0.1.0").unwrap().unwrap();
+        assert!(info.asset_digest.is_none());
+
+        let wrong_length = r#"{"tag_name":"v9.9.9","html_url":"https://github.com/elvishasleft/manabar/releases/tag/v9.9.9","assets":[{"name":"ManaBar_9.9.9_portable.exe","size":5,"browser_download_url":"https://github.com/elvishasleft/manabar/releases/download/v9.9.9/ManaBar_9.9.9_portable.exe","digest":"sha256:abcd"}]}"#;
+        let info = parse_latest_release(wrong_length, "0.1.0")
+            .unwrap()
+            .unwrap();
+        assert!(info.asset_digest.is_none());
+    }
+
+    #[test]
+    fn oversized_portable_asset_has_no_asset_url() {
+        let body = format!(
+            r#"{{"tag_name":"v9.9.9","html_url":"https://github.com/elvishasleft/manabar/releases/tag/v9.9.9","assets":[{{"name":"ManaBar_9.9.9_portable.exe","size":{},"browser_download_url":"https://github.com/elvishasleft/manabar/releases/download/v9.9.9/ManaBar_9.9.9_portable.exe"}}]}}"#,
+            MAX_ASSET_SIZE + 1
+        );
+        let info = parse_latest_release(&body, "0.1.0").unwrap().unwrap();
+        assert!(info.asset_url.is_none());
+        assert!(info.asset_size.is_none());
+    }
+
+    #[test]
+    fn two_portable_assets_picks_the_first() {
+        let body = r#"{"tag_name":"v9.9.9","html_url":"https://github.com/elvishasleft/manabar/releases/tag/v9.9.9","assets":[{"name":"ManaBar_9.9.9_portable.exe","size":111,"browser_download_url":"https://github.com/elvishasleft/manabar/releases/download/v9.9.9/ManaBar_9.9.9_portable.exe"},{"name":"ManaBar_9.9.9_alt_portable.exe","size":222,"browser_download_url":"https://github.com/elvishasleft/manabar/releases/download/v9.9.9/ManaBar_9.9.9_alt_portable.exe"}]}"#;
+        let info = parse_latest_release(body, "0.1.0").unwrap().unwrap();
+        assert_eq!(info.asset_size, Some(111));
+        assert!(info
+            .asset_url
+            .as_deref()
+            .unwrap()
+            .ends_with("ManaBar_9.9.9_portable.exe"));
     }
 
     #[test]

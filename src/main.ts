@@ -105,8 +105,13 @@ document.querySelector<HTMLElement>("#app")!.addEventListener("click", (e) => {
 listen<View[]>("state", (e) => render(e.payload));
 listen<UpdateInfo | null>("update", (e) => {
   updateInfo = e.payload;
-  updatePhase = "idle";
-  updateError = undefined;
+  // Don't clobber an in-flight apply_update: the daily/interval re-check can
+  // land mid-download and would otherwise reset the button back to its idle
+  // label while a download is still running.
+  if (updatePhase !== "busy") {
+    updatePhase = "idle";
+    updateError = undefined;
+  }
   if (current.length) render(current);
 });
 invoke<UpdateInfo | null>("update_status")

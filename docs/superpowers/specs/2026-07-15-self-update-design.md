@@ -70,12 +70,18 @@ DMG cannot be swapped in place gracefully; not attempted.
 - **Pinned source.** Only `https://api.github.com/repos/elvishasleft/
   manabar/releases/latest` is queried, and only asset URLs returned by
   that response are downloaded. No redirects to non-GitHub hosts are
-  followed (reqwest redirect policy restricted to github.com hosts for
-  the download request).
+  followed (custom reqwest redirect policy on both updater clients:
+  https-only, hosts limited to github.com, api.github.com, and
+  *.githubusercontent.com — GitHub asset downloads legitimately redirect
+  to githubusercontent.com object hosts).
 - **Integrity check.** Downloaded byte count must equal the asset
   `size` from the API response; mismatch → delete the partial file and
   abort. Nothing downloaded is ever executed without the user having
-  clicked Update.
+  clicked Update. When the API response carries a sha256 `digest` for
+  the asset, the downloaded bytes' SHA-256 must additionally match it;
+  size-only verification is the floor for releases predating the digest
+  field. Assets larger than 100 MB are rejected at parse time as a
+  sanity cap.
 - **Injection safety.** `tag_name` and release URL are attacker-ish
   inputs (repo compromise scenario). They are rendered in the panel
   through the same escaping helpers covered by the existing CSP
@@ -107,3 +113,8 @@ DMG cannot be swapped in place gracefully; not attempted.
   paths + current state, output: ordered file operations) and unit
   tested; the thin IO wrapper is validated manually and by the next
   real release.
+- Accepted deviation (v0.7.0): the swap sequence keeps its IO inline in
+  `apply_inner` rather than the originally sketched pure "plan function"
+  extraction; compensated by three review rounds on that path, the
+  poison/reentrancy guards, and a manual first-release verification of
+  the one-click path when v0.7.1 ships.

@@ -11,7 +11,8 @@
     {
       "name": "ManaBar_9.9.9_portable.exe",
       "size": 2222,
-      "browser_download_url": "https://github.com/elvishasleft/manabar/releases/download/v9.9.9/ManaBar_9.9.9_portable.exe"
+      "browser_download_url": "https://github.com/elvishasleft/manabar/releases/download/v9.9.9/ManaBar_9.9.9_portable.exe",
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     }
   ]
 }
