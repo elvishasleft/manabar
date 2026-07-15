@@ -71,11 +71,31 @@ pub fn cleanup_old_exe() {
 static UPDATE_IN_PROGRESS: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
-/// Windows: download → size-check → rename dance → relaunch. Every failure
-/// rolls back to the pre-step state and returns Err for the panel to show.
+/// Set once `apply_inner` hits a double fault (swap rename failed AND the
+/// rollback rename failed). `apply_inner` starts with an unconditional
+/// `remove_file(&old)`, so re-entering it after a double fault would delete
+/// the just-preserved `.old` recovery backup and then fail again (the
+/// canonical exe path is gone). Poisoning permanently blocks retries in this
+/// process; a restarted process starts fresh, and `cleanup_old_exe()` only
+/// discards `.old` on a healthy start.
+#[cfg(windows)]
+static UPDATE_POISONED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Thin reentrancy + poison guard around [`apply_inner`]. Rejects concurrent
+/// calls while an update is in flight, and — once a prior attempt has hit a
+/// double fault — permanently rejects further calls in this process so the
+/// preserved on-disk `.old` backup can never be clobbered by a retry.
 #[cfg(windows)]
 pub async fn apply(app: AppHandle, info: UpdateInfo) -> Result<(), String> {
     use std::sync::atomic::Ordering;
+
+    if UPDATE_POISONED.load(Ordering::SeqCst) {
+        return Err(
+            "previous update attempt failed critically — restart the app or reinstall; \
+             on-disk backup (.old) was preserved"
+                .into(),
+        );
+    }
 
     if UPDATE_IN_PROGRESS
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
@@ -92,6 +112,8 @@ pub async fn apply(app: AppHandle, info: UpdateInfo) -> Result<(), String> {
     result
 }
 
+/// Windows: download → size-check → rename dance → relaunch. Every failure
+/// rolls back to the pre-step state and returns Err for the panel to show.
 #[cfg(windows)]
 async fn apply_inner(app: AppHandle, info: UpdateInfo) -> Result<(), String> {
     let (Some(url), Some(size)) = (info.asset_url.clone(), info.asset_size) else {
@@ -130,10 +152,13 @@ async fn apply_inner(app: AppHandle, info: UpdateInfo) -> Result<(), String> {
         // roll back: put the running image's name back
         if let Err(re) = std::fs::rename(&old, &exe) {
             // Double fault: exe path is empty; leave .old and .new on disk
-            // for manual recovery instead of deleting evidence.
+            // for manual recovery instead of deleting evidence. Poison the
+            // process so a retry can't run apply_inner's unconditional
+            // `remove_file(&old)` and destroy the preserved backup.
+            UPDATE_POISONED.store(true, std::sync::atomic::Ordering::SeqCst);
             log::error!("update swap failed ({e}) and rollback also failed ({re})");
             return Err(format!(
-                "swap failed and rollback also failed — reinstall needed, old exe kept as .old: {e}"
+                "swap failed ({e}) and rollback also failed ({re}) — reinstall needed, old exe kept as .old"
             ));
         }
         let _ = std::fs::remove_file(&new);
