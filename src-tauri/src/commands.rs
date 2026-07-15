@@ -186,6 +186,38 @@ pub async fn refresh_signin(
     }
 }
 
+#[tauri::command]
+pub async fn update_status(
+    upd: tauri::State<'_, crate::updater::UpdateShared>,
+) -> Result<Option<manabar_core::updater::UpdateInfo>, String> {
+    Ok(upd.0.lock().await.clone())
+}
+
+/// Opens the stored, already-validated release page. The URL is never taken
+/// from the frontend — the webview cannot pass an arbitrary URL here.
+#[tauri::command]
+pub async fn open_release_notes(
+    upd: tauri::State<'_, crate::updater::UpdateShared>,
+) -> Result<(), String> {
+    let url = upd
+        .0
+        .lock()
+        .await
+        .as_ref()
+        .map(|u| u.notes_url.clone())
+        .ok_or("no update available")?;
+    tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn apply_update(
+    app: tauri::AppHandle,
+    upd: tauri::State<'_, crate::updater::UpdateShared>,
+) -> Result<(), String> {
+    let info = upd.0.lock().await.clone().ok_or("no update available")?;
+    crate::updater::apply(app, info).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

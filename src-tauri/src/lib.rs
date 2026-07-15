@@ -382,11 +382,15 @@ pub fn run() {
             None,
         ))
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             commands::get_state,
             commands::refresh_now,
             commands::panel_opened,
-            commands::refresh_signin
+            commands::refresh_signin,
+            commands::update_status,
+            commands::open_release_notes,
+            commands::apply_update
         ])
         .setup(|app| {
             let cfg_path = config::config_path();

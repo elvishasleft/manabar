@@ -66,3 +66,58 @@ pub fn cleanup_old_exe() {
         let _ = std::fs::remove_file(old);
     }
 }
+
+/// Windows: download → size-check → rename dance → relaunch. Every failure
+/// rolls back to the pre-step state and returns Err for the panel to show.
+#[cfg(windows)]
+pub async fn apply(app: AppHandle, info: UpdateInfo) -> Result<(), String> {
+    let (Some(url), Some(size)) = (info.asset_url.clone(), info.asset_size) else {
+        return Err("this release has no portable build".into());
+    };
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let new = exe.with_extension("exe.new");
+    let old = exe.with_extension("exe.old");
+
+    let client = reqwest::Client::builder()
+        .user_agent(ua())
+        .timeout(Duration::from_secs(600))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
+    if resp.status() != 200 {
+        return Err(format!("download failed: HTTP {}", resp.status()));
+    }
+    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+    if bytes.len() as u64 != size {
+        return Err(format!(
+            "size mismatch: got {} bytes, expected {size}",
+            bytes.len()
+        ));
+    }
+    if let Err(e) = std::fs::write(&new, &bytes) {
+        let _ = std::fs::remove_file(&new);
+        return Err(format!("write failed: {e}"));
+    }
+    let _ = std::fs::remove_file(&old);
+    if let Err(e) = std::fs::rename(&exe, &old) {
+        let _ = std::fs::remove_file(&new);
+        return Err(format!("rename current exe failed: {e}"));
+    }
+    if let Err(e) = std::fs::rename(&new, &exe) {
+        // roll back: put the running image's name back
+        let _ = std::fs::rename(&old, &exe);
+        let _ = std::fs::remove_file(&new);
+        return Err(format!("swap failed: {e}"));
+    }
+    std::process::Command::new(&exe)
+        .spawn()
+        .map_err(|e| format!("relaunch failed (update IS installed): {e}"))?;
+    app.exit(0);
+    Ok(())
+}
+
+/// Non-Windows: no in-place swap; open the release page instead.
+#[cfg(not(windows))]
+pub async fn apply(_app: AppHandle, info: UpdateInfo) -> Result<(), String> {
+    tauri_plugin_opener::open_url(info.notes_url, None::<&str>).map_err(|e| e.to_string())
+}
