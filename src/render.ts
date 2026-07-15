@@ -268,6 +268,28 @@ function refreshButtonHtml(v: View): string {
   return `<button type="button" class="refresh-btn" data-kind="${v.kind}">${label}</button>`;
 }
 
+export interface UpdateInfo {
+  version: string;
+  notes_url: string;
+}
+export type UpdatePhase = "idle" | "busy" | "error";
+
+// Update notice line for the footer. Version and error text are attacker-ish
+// inputs (compromised-release scenario) — everything goes through esc().
+export function updateNotice(
+  u: UpdateInfo | null,
+  phase: UpdatePhase,
+  error?: string,
+): string {
+  if (!u) return "";
+  const btn =
+    phase === "busy"
+      ? `<button class="update-btn" disabled>downloading…</button>`
+      : `<button class="update-btn">Update</button>`;
+  const err = phase === "error" && error ? ` <span class="update-err">${esc(error)}</span>` : "";
+  return `<div class="update-line">v${esc(u.version)} available · ${btn} · <button class="update-notes">notes ↗</button>${err}</div>`;
+}
+
 export function card(v: View): string {
   const windowsHtml = v.error_kind
     ? `<div class="win-line win-error"><span class="err-icon" aria-hidden="true">⚠</span>${esc(errorCopy(v))}</div>${refreshButtonHtml(v)}`

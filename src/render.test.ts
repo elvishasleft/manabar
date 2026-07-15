@@ -88,3 +88,35 @@ describe("card escapes API-derived strings", () => {
     expect(html).toContain('<span class="plan">Max 20x</span>');
   });
 });
+
+import { updateNotice } from "./render";
+
+describe("updateNotice", () => {
+  test("renders nothing when no update", () => {
+    expect(updateNotice(null, "idle")).toBe("");
+  });
+
+  test("renders version, update button, and notes link", () => {
+    const html = updateNotice({ version: "9.9.9", notes_url: "https://github.com/elvishasleft/manabar/releases/tag/v9.9.9" }, "idle");
+    expect(html).toContain("v9.9.9 available");
+    expect(html).toContain('class="update-btn"');
+    expect(html).toContain("update-notes");
+  });
+
+  test("escapes hostile version strings", () => {
+    const html = updateNotice({ version: "<img src=x onerror=1>", notes_url: "https://github.com/elvishasleft/manabar/x" }, "idle");
+    expect(html).not.toContain("<img");
+    expect(html).toContain("&lt;img");
+  });
+
+  test("busy phase disables the button and shows progress", () => {
+    const html = updateNotice({ version: "9.9.9", notes_url: "https://github.com/elvishasleft/manabar/x" }, "busy");
+    expect(html).toContain("disabled");
+    expect(html).toContain("downloading…");
+  });
+
+  test("error phase renders the escaped error", () => {
+    const html = updateNotice({ version: "9.9.9", notes_url: "https://github.com/elvishasleft/manabar/x" }, "error", "<b>boom</b>");
+    expect(html).toContain("&lt;b&gt;boom&lt;/b&gt;");
+  });
+});
