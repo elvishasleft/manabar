@@ -66,11 +66,18 @@ document.querySelector<HTMLElement>("#app")!.addEventListener("click", (e) => {
   if (upd && !upd.disabled && updatePhase !== "busy") {
     updatePhase = "busy";
     if (current.length) render(current);
-    invoke("apply_update").catch((err) => {
-      updatePhase = "error";
-      updateError = String(err);
-      if (current.length) render(current);
-    });
+    invoke("apply_update")
+      .then(() => {
+        // Non-Windows: apply_update opens the Releases page and resolves.
+        // (On Windows success the process restarts and this never runs.)
+        updatePhase = "idle";
+        if (current.length) render(current);
+      })
+      .catch((err) => {
+        updatePhase = "error";
+        updateError = String(err);
+        if (current.length) render(current);
+      });
     return;
   }
   const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(".refresh-btn");
