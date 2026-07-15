@@ -1,0 +1,17 @@
+{
+  "tag_name": "v9.9.9",
+  "html_url": "https://github.com/elvishasleft/manabar/releases/tag/v9.9.9",
+  "prerelease": false,
+  "assets": [
+    {
+      "name": "ManaBar_9.9.9_aarch64.dmg",
+      "size": 1111,
+      "browser_download_url": "https://github.com/elvishasleft/manabar/releases/download/v9.9.9/ManaBar_9.9.9_aarch64.dmg"
+    },
+    {
+      "name": "ManaBar_9.9.9_portable.exe",
+      "size": 2222,
+      "browser_download_url": "https://github.com/elvishasleft/manabar/releases/download/v9.9.9/ManaBar_9.9.9_portable.exe"
+    }
+  ]
+}
