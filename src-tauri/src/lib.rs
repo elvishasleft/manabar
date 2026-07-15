@@ -3,6 +3,7 @@ mod config;
 mod icon;
 mod state;
 mod tray;
+mod updater;
 
 use chrono::{DateTime, Utc};
 use manabar_core::model::{Health, ProviderKind, ProviderView, RateWindow};
@@ -391,6 +392,9 @@ pub fn run() {
             let cfg_path = config::config_path();
             config::migrate_legacy(&config::legacy_config_path(), &cfg_path);
             let cfg = config::load(&cfg_path);
+            updater::cleanup_old_exe();
+            app.manage(updater::UpdateShared::default());
+            updater::spawn(app.handle().clone(), cfg.update_check);
             if !cfg_path.exists() {
                 if let Err(e) = config::save(&cfg_path, &cfg) {
                     log::warn!("failed to write default config: {e}");
