@@ -83,12 +83,31 @@ async fn check_once(app: &AppHandle, client: &reqwest::Client) {
     let _ = app.emit("update", &update);
 }
 
-/// Best-effort removal of the previous exe left behind by a swap update.
-pub fn cleanup_old_exe() {
+/// Startup gate + cleanup for the swap updater. If a `manabar.exe.old`
+/// exists next to the current exe, a just-updated instance is starting
+/// while the previous instance may still be exiting: its running image IS
+/// the `.old` file, which Windows refuses to delete until the process is
+/// gone. Retry the delete briefly — success doubles as both the "previous
+/// instance has exited" signal (so the single-instance plugin won't forward
+/// to a dying process and quit) and the cleanup itself.
+pub fn wait_for_previous_instance() {
     #[cfg(windows)]
-    if let Ok(exe) = std::env::current_exe() {
+    {
+        let Ok(exe) = std::env::current_exe() else {
+            return;
+        };
         let old = exe.with_extension("exe.old");
-        let _ = std::fs::remove_file(old);
+        if !old.exists() {
+            return;
+        }
+        for _ in 0..100 {
+            if std::fs::remove_file(&old).is_ok() {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        // Still locked after ~10s: give up; worst case matches the old
+        // behavior (single-instance forward to a dying process).
     }
 }
 
@@ -101,8 +120,8 @@ static UPDATE_IN_PROGRESS: std::sync::atomic::AtomicBool =
 /// `remove_file(&old)`, so re-entering it after a double fault would delete
 /// the just-preserved `.old` recovery backup and then fail again (the
 /// canonical exe path is gone). Poisoning permanently blocks retries in this
-/// process; a restarted process starts fresh, and `cleanup_old_exe()` only
-/// discards `.old` on a healthy start.
+/// process; a restarted process starts fresh, and `wait_for_previous_instance()`
+/// only discards `.old` once the previous process has actually released it.
 #[cfg(windows)]
 static UPDATE_POISONED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
@@ -136,11 +155,6 @@ pub async fn apply(app: AppHandle, info: UpdateInfo) -> Result<(), String> {
     }
     result
 }
-
-/// Windows `CREATE_NO_WINDOW` flag: suppresses the console window the
-/// detached relaunch `cmd.exe` would otherwise flash open.
-#[cfg(windows)]
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// Hex-encodes a SHA-256 digest as lowercase hex, matching the format GitHub
 /// uses in the asset `digest` field (`"sha256:<hex>"`). No `hex` crate
@@ -223,19 +237,14 @@ async fn apply_inner(app: AppHandle, info: UpdateInfo) -> Result<(), String> {
         return Err(format!("swap failed: {e}"));
     }
 
-    // Relaunch via a detached ~2s delay so the old process has fully exited
-    // before the new one hits the single-instance check (otherwise the new
-    // instance can forward to the dying process and quit).
-    use std::os::windows::process::CommandExt;
-    std::process::Command::new("cmd")
-        .args([
-            "/C",
-            &format!(
-                "ping -n 3 127.0.0.1 > nul & start \"\" \"{}\"",
-                exe.display()
-            ),
-        ])
-        .creation_flags(CREATE_NO_WINDOW)
+    // Relaunch directly — no shell involved, so no re-parsing of the exe
+    // path (the old `cmd /C "ping ... & start "" "<exe>""` trick silently
+    // mis-launched when the path contained `&` or `^`). The new process may
+    // start while this one is still exiting; it resolves that race itself
+    // via `wait_for_previous_instance` at the top of `run()`, which blocks
+    // on the `.old` file's delete-lock until this process is actually gone
+    // before the single-instance plugin initializes.
+    std::process::Command::new(&exe)
         .spawn()
         .map_err(|e| format!("relaunch failed (update IS installed): {e}"))?;
     app.exit(0);

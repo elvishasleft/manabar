@@ -356,6 +356,14 @@ pub(crate) fn effective_poll_interval(secs: u64) -> Option<Duration> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Must run before the single-instance plugin initializes (first thing
+    // in the builder chain below): if this is a just-updated instance
+    // starting while the previous instance is still exiting, its running
+    // image IS `manabar.exe.old`, and forwarding to it here would hand focus
+    // to a process that's about to disappear and quit. Blocks until that
+    // `.old` file's delete-lock clears (or gives up after ~10s).
+    updater::wait_for_previous_instance();
+
     tauri::Builder::default()
         // Must be registered first, before any other plugin — a documented
         // requirement of tauri-plugin-single-instance so it can intercept a
@@ -396,7 +404,6 @@ pub fn run() {
             let cfg_path = config::config_path();
             config::migrate_legacy(&config::legacy_config_path(), &cfg_path);
             let cfg = config::load(&cfg_path);
-            updater::cleanup_old_exe();
             app.manage(updater::UpdateShared::default());
             updater::spawn(app.handle().clone(), cfg.update_check);
             if !cfg_path.exists() {
