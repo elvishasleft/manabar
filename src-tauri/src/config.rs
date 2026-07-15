@@ -64,6 +64,10 @@ pub struct Config {
     /// the menu bar (see `tray::menubar_title`). Ignored on Windows, where
     /// there is no menu bar text concept. Defaults to `true`.
     pub menubar_text: bool,
+    /// Daily anonymous check of the GitHub releases feed. `false` disables
+    /// the network call entirely (privacy opt-out; see the spec's security
+    /// section).
+    pub update_check: bool,
 }
 
 impl Default for Config {
@@ -76,6 +80,7 @@ impl Default for Config {
             deepseek_budget: None,
             thresholds: ThresholdsConfig::default(),
             menubar_text: true,
+            update_check: true,
         }
     }
 }
@@ -437,5 +442,12 @@ mod tests {
         });
         let t = price_table(&cfg);
         assert_eq!(t.price_for("claude-opus-4-8").unwrap().output, 2.0);
+    }
+
+    #[test]
+    fn update_check_defaults_true_and_parses_false() {
+        assert!(Config::default().update_check);
+        let cfg: Config = serde_json::from_str(r#"{"update_check":false}"#).unwrap();
+        assert!(!cfg.update_check);
     }
 }
