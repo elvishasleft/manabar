@@ -67,10 +67,33 @@ pub fn cleanup_old_exe() {
     }
 }
 
+#[cfg(windows)]
+static UPDATE_IN_PROGRESS: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
 /// Windows: download → size-check → rename dance → relaunch. Every failure
 /// rolls back to the pre-step state and returns Err for the panel to show.
 #[cfg(windows)]
 pub async fn apply(app: AppHandle, info: UpdateInfo) -> Result<(), String> {
+    use std::sync::atomic::Ordering;
+
+    if UPDATE_IN_PROGRESS
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return Err("update already in progress".into());
+    }
+    let result = apply_inner(app, info).await;
+    if result.is_err() {
+        // On success the process exits/restarts, so there is no one left to
+        // observe the flag; only clear it on the error paths.
+        UPDATE_IN_PROGRESS.store(false, Ordering::SeqCst);
+    }
+    result
+}
+
+#[cfg(windows)]
+async fn apply_inner(app: AppHandle, info: UpdateInfo) -> Result<(), String> {
     let (Some(url), Some(size)) = (info.asset_url.clone(), info.asset_size) else {
         return Err("this release has no portable build".into());
     };
@@ -105,7 +128,14 @@ pub async fn apply(app: AppHandle, info: UpdateInfo) -> Result<(), String> {
     }
     if let Err(e) = std::fs::rename(&new, &exe) {
         // roll back: put the running image's name back
-        let _ = std::fs::rename(&old, &exe);
+        if let Err(re) = std::fs::rename(&old, &exe) {
+            // Double fault: exe path is empty; leave .old and .new on disk
+            // for manual recovery instead of deleting evidence.
+            log::error!("update swap failed ({e}) and rollback also failed ({re})");
+            return Err(format!(
+                "swap failed and rollback also failed — reinstall needed, old exe kept as .old: {e}"
+            ));
+        }
         let _ = std::fs::remove_file(&new);
         return Err(format!("swap failed: {e}"));
     }
